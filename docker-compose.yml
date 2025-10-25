@@ -41,7 +41,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 90s
+      start_period: 150s
     networks:
       - app-network
 
@@ -49,7 +49,7 @@ services:
     image: anastasiia191006/userstory-frontend:latest
     container_name: userstory-frontend
     environment:
-      REACT_APP_BACKEND_URL: http://backend:8080/api
+      REACT_APP_BACKEND_URL: http://backend:8080
     ports:
       - "80:80"
     depends_on:
@@ -59,7 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 90s
     networks:
       - app-network
 

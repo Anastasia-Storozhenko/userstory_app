@@ -44,7 +44,7 @@ pipeline {
                 }
             }
         }
-      stage('Build Docker Images') {
+        stage('Build Docker Images') {
             steps {
                 script {
                     sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ./frontend"
@@ -66,7 +66,7 @@ pipeline {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
-                    sh "sleep 60"
+                    sh "sleep 150"
                     sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                     sh "docker -H ${DOCKER_HOST} inspect userstory-backend | grep Health || echo 'No backend health status'"
                     sh "docker -H ${DOCKER_HOST} inspect userstory-frontend | grep Health || echo 'No frontend health status'"
@@ -86,6 +86,24 @@ pipeline {
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://backend:8080/projects || echo 'API check failed'
+                    """
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://backend:8080/api/projects || echo 'API check failed'
+                    """
+                }
+            }
+        }
+        stage('Test Frontend') {
+            steps {
+                script {
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://frontend:80/projects || echo 'Frontend API check failed'
+                    """
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://frontend:80/api/projects || echo 'Frontend API check failed'
                     """
                 }
             }
