@@ -12,10 +12,12 @@ services:
       - "3306:3306"
     volumes:
       - db-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mariadb-admin", "--protocol=tcp", "ping"]
       interval: 10s
       retries: 5
+      start_period: 30s
     networks:
       - app-network
 
@@ -43,7 +45,14 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s    
     networks:
       - app-network
 

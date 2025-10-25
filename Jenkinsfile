@@ -12,12 +12,18 @@ pipeline {
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
-        // ВИПРАВЛЕНО: Використовуємо Docker Hub username
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-frontend:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-backend:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
     }
     stages {
+        stage('Check Docker Host') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} info || exit 1"
+                }
+            }
+        }
         stage('Checkout') {
             steps {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
@@ -50,9 +56,15 @@ pipeline {
             steps {
                 script {
                     sh "echo ${DOCKER_CREDENTIALS_PSW} | docker -H ${DOCKER_HOST} login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
-           
                     sh "docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}"
                     sh "docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}"
+                }
+            }
+        }
+        stage('Test Backend API') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} run --rm --network app-network curlimages/curl curl http://backend:8080/projects || echo 'API check failed'"
                 }
             }
         }
@@ -61,6 +73,13 @@ pipeline {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d"
+                }
+            }
+        }
+        stage('Check Nginx Logs') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} logs userstory-frontend || echo 'No logs available'"
                 }
             }
         }
