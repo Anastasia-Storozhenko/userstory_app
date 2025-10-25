@@ -61,18 +61,30 @@ pipeline {
                 }
             }
         }
-        stage('Test Backend API') {
-            steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} run --rm --network app-network curlimages/curl curl http://backend:8080/projects || echo 'API check failed'"
-                }
-            }
-        }
         stage('Deploy') {
             steps {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d"
+                    // Додаємо затримку, щоб бекенд встиг запуститись
+                    sh "sleep 30"
+                }
+            }
+        }
+        stage('Test Backend API') {
+            steps {
+                script {
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://backend:8080/projects || echo 'API check failed'
+                    """
+                }
+            }
+        }
+        stage('Check Backend Logs') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} logs userstory-backend || echo 'No backend logs available'"
                 }
             }
         }
