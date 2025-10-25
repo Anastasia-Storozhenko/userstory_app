@@ -67,6 +67,7 @@ pipeline {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
                     sh "sleep 60"
+                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                 }
             }
         }

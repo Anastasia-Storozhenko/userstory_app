@@ -30,7 +30,7 @@ services:
       SPRING_DATASOURCE_USERNAME: userstory_user
       SPRING_DATASOURCE_PASSWORD: userstory_pass
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_PROPERTIES_HIBERNATE_CONNECTION_AUTOCOMMIT: true
+      SPRING_JPA_PROPERTIES_HIBERNATE_CONNECTION_AUTOCOMMIT: "true"
     ports:
       - "8080:8080"
     depends_on:
@@ -49,12 +49,18 @@ services:
     image: anastasiia191006/userstory-frontend:latest
     container_name: userstory-frontend
     environment:
-      REACT_APP_BACKEND_URL: http://backend:8080/api
+      REACT_APP_BACKEND_URL: http://backend:8080
     ports:
       - "80:80"
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80 || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - app-network
 
