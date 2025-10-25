@@ -38,7 +38,8 @@ services:
   frontend:
     image: anastasiia191006/userstory-frontend:latest
     container_name: userstory-frontend
-    # ВИПРАВЛЕНО: Видаляємо environment, бо nginx проксує запити
+    environment:
+      REACT_APP_BACKEND_URL: http://192.168.56.20:8081/api
     ports:
       - "80:80"
     depends_on:
