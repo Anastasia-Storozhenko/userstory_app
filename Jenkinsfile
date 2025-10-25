@@ -60,6 +60,18 @@ pipeline {
                 script {
                     sh "docker -H ${DOCKER_HOST} stop userstory-backend userstory-frontend userstory-db || true"
                     sh "docker -H ${DOCKER_HOST} rm userstory-backend userstory-frontend userstory-db || true"
+            
+                     // Зупиняємо всі контейнери, які використовують порт 8080
+                    sh "docker -H ${DOCKER_HOST} ps -q --filter 'publish=8080' | xargs -r docker -H ${DOCKER_HOST} stop || true"
+                    sh "docker -H ${DOCKER_HOST} ps -aq --filter 'publish=8080' | xargs -r docker -H ${DOCKER_HOST} rm || true"
+            
+                    // Або знаходимо і зупиняємо процес, який займає порт
+                    sh "ssh vagrant@192.168.56.20 'sudo fuser -k 8080/tcp || true'"
+            
+                    // Чекаємо трохи
+                    sh "sleep 5"
+            
+                    // Запускаємо docker-compose
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d"
                 }
