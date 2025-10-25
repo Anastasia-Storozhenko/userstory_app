@@ -68,6 +68,8 @@ pipeline {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
                     sh "sleep 60"
                     sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
+                    sh "docker -H ${DOCKER_HOST} inspect userstory-backend | grep Health || echo 'No backend health status'"
+                    sh "docker -H ${DOCKER_HOST} inspect userstory-frontend | grep Health || echo 'No frontend health status'"
                 }
             }
         }
