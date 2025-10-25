@@ -66,7 +66,7 @@ pipeline {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
-                    sh "sleep 150"
+                    sh "sleep 180"
                     sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                     sh "docker -H ${DOCKER_HOST} inspect userstory-backend | grep Health || echo 'No backend health status'"
                     sh "docker -H ${DOCKER_HOST} inspect userstory-frontend | grep Health || echo 'No frontend health status'"
@@ -77,6 +77,16 @@ pipeline {
             steps {
                 script {
                     sh "docker -H ${DOCKER_HOST} logs userstory-backend || echo 'No backend logs available'"
+                }
+            }
+        }
+        stage('Check Database') {
+            steps {
+                script {
+                    sh """
+                    docker -H ${DOCKER_HOST} exec userstory-db mariadb -uuserstory_user -puserstory_pass userstory -e \
+                    "SELECT * FROM projects;" || echo 'Database check failed'
+                    """
                 }
             }
         }
@@ -104,6 +114,10 @@ pipeline {
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://frontend:80/api/projects || echo 'Frontend API check failed'
+                    """
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://192.168.56.20:80/projects || echo 'External frontend API check failed'
                     """
                 }
             }

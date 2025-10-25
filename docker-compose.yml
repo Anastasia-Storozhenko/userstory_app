@@ -29,7 +29,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/userstory
       SPRING_DATASOURCE_USERNAME: userstory_user
       SPRING_DATASOURCE_PASSWORD: userstory_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
       SPRING_JPA_PROPERTIES_HIBERNATE_CONNECTION_AUTOCOMMIT: "true"
     ports:
       - "8080:8080"
@@ -41,7 +41,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 150s
+      start_period: 180s
     networks:
       - app-network
 
@@ -59,7 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 90s
+      start_period: 120s
     networks:
       - app-network
 
