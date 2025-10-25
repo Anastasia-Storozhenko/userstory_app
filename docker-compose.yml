@@ -1,0 +1,57 @@
+version: '3.8'
+services:
+  db:
+    build: ./db
+    container_name: userstory-db
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: userstory
+      MARIADB_USER: userstory_user
+      MARIADB_PASSWORD: userstory_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "--protocol=tcp", "ping"]
+      interval: 10s
+      retries: 5
+    networks:
+      - app-network
+
+  backend:
+    build: ./backend
+    container_name: userstory-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/userstory
+      SPRING_DATASOURCE_USERNAME: userstory_user
+      SPRING_DATASOURCE_PASSWORD: userstory_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    container_name: userstory-frontend
+    environment:
+      REACT_APP_BACKEND_URL: http://backend:8080/api  # Змінено на /api, якщо бекенд використовує /api/projects
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf  # Монтуємо nginx.conf
+    networks:
+      - app-network
+
+volumes:
+  db-data:
+
+networks:
+  app-network:
+    driver: bridge
