@@ -44,14 +44,11 @@ pipeline {
                 }
             }
         }
-        stage('Build Docker Images') {
-            environment {
-                DOCKER_BUILDKIT = "1"
-            }
+      stage('Build Docker Images') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} buildx build --platform linux/amd64 -t ${FRONTEND_IMAGE} ./frontend --load"
-                    sh "docker -H ${DOCKER_HOST} buildx build --platform linux/amd64 -t ${BACKEND_IMAGE} ./backend --load"
+                    sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ./frontend"
+                    sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ./backend"
                 }
             }
         }
