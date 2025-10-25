@@ -58,8 +58,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} compose down || true"
-                    sh "docker -H ${DOCKER_HOST} compose up -d"
+                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
+                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d"
                 }
             }
         }
