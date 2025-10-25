@@ -12,8 +12,9 @@ pipeline {
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/anastasia-storozhenko/userstory-frontend:latest"
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasia-storozhenko/userstory-backend:latest"
+        // ВИПРАВЛЕНО: Використовуємо Docker Hub username
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-frontend:latest"
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-backend:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
     }
     stages {
@@ -26,7 +27,6 @@ pipeline {
             steps {
                 dir('frontend') {
                     sh 'npm install'
-                    // Додаємо змінну середовища, щоб ігнорувати ESLint помилки
                     sh 'CI=false npm run build'
                 }
             }

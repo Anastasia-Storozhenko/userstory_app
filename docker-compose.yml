@@ -20,7 +20,8 @@ services:
       - app-network
 
   backend:
-    image: anastasia-storozhenko/userstory-backend:latest
+    # ВИПРАВЛЕНО: Використовуємо Docker Hub username
+    image: anastasiia191006/userstory-backend:latest
     container_name: userstory-backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/userstory
@@ -36,7 +37,8 @@ services:
       - app-network
 
   frontend:
-    image: anastasia-storozhenko/userstory-frontend:latest
+    # ВИПРАВЛЕНО: Використовуємо Docker Hub username
+    image: anastasiia191006/userstory-frontend:latest
     container_name: userstory-frontend
     environment:
       REACT_APP_BACKEND_URL: http://backend:8080/api
