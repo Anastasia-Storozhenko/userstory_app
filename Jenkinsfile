@@ -119,6 +119,10 @@ pipeline {
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://192.168.56.20:80/projects || echo 'External frontend API check failed'
                     """
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s http://192.168.56.20:80/api/projects || echo 'External frontend API check failed'
+                    """
                 }
             }
         }
