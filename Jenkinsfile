@@ -50,8 +50,9 @@ pipeline {
             steps {
                 script {
                     sh "echo ${DOCKER_CREDENTIALS_PSW} | docker -H ${DOCKER_HOST} login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
-                    sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ./frontend"
-                    sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ./backend"
+           
+                    sh "docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}"
+                    sh "docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}"
                 }
             }
         }
