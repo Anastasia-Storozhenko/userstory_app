@@ -28,7 +28,7 @@ pipeline {
         }
         stage('Build Frontend') {
             steps {
-                dir('userstory_front') {
+                dir('frontend') {
                     sh 'npm install'
                     sh 'npm run build'
                 }
@@ -36,7 +36,7 @@ pipeline {
         }
         stage('Build Backend') {
             steps {
-                dir('userstoryproj_back') {
+                dir('backend') {
                     sh 'mvn clean package -DskipTests'
                 }
             }
