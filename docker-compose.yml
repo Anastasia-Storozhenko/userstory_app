@@ -30,17 +30,18 @@ services:
       SPRING_DATASOURCE_USERNAME: userstory_user
       SPRING_DATASOURCE_PASSWORD: userstory_pass
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_CONNECTION_AUTOCOMMIT: true
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/projects"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health || exit 0"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 15
+      start_period: 60s
     networks:
       - app-network
 

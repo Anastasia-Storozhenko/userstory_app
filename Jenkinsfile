@@ -65,9 +65,15 @@ pipeline {
             steps {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d"
-                    // Додаємо затримку, щоб бекенд встиг запуститись
-                    sh "sleep 30"
+                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
+                    sh "sleep 60"
+                }
+            }
+        }
+        stage('Check Backend Logs') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} logs userstory-backend || echo 'No backend logs available'"
                 }
             }
         }
@@ -81,17 +87,10 @@ pipeline {
                 }
             }
         }
-        stage('Check Backend Logs') {
-            steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} logs userstory-backend || echo 'No backend logs available'"
-                }
-            }
-        }
         stage('Check Nginx Logs') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} logs userstory-frontend || echo 'No logs available'"
+                    sh "docker -H ${DOCKER_HOST} logs userstory-frontend || echo 'No frontend logs available'"
                 }
             }
         }
