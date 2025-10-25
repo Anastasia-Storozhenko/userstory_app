@@ -1,15 +1,16 @@
 pipeline {
     agent any
     tools {
-        nodejs 'NodeJS-20.11.0' // Вказуємо Node.js 20.11.0
-        jdk 'JDK17' // Вказуємо Java 17
-        maven 'Maven3.6.3' // Вказуємо Maven
+        nodejs 'nodejs-20.11.0' // Використовуємо маленькі літери
+        jdk 'jdk17' // Використовуємо маленькі літери
+        maven 'maven-3.6.3' // Використовуємо маленькі літери
     }
     environment {
         // Змінні для бази даних
+        DB_USER = credentials('db-credentials')
         DB_USERSTORYPROJ_URL = 'jdbc:mariadb://192.168.56.20:3306/userstory'
-        DB_USERSTORYPROJ_USER = credentials('db-credentials') // Логін
-        DB_USERSTORYPROJ_PASSWORD = credentials('db-credentials') // Пароль
+        DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
+        DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         // Docker Registry
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
@@ -42,24 +43,27 @@ pipeline {
         }
         stage('Build Docker Images') {
             steps {
-                dir('userstory_front') {
-                    sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
-                }
-                dir('userstoryproj_back') {
-                    sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
+                script {
+                    sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ./userstory_front"
+                    sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ./userstoryproj_back"
                 }
             }
         }
         stage('Push Docker Images') {
             steps {
-                sh "echo ${DOCKER_CREDENTIALS_PSW} | docker -H ${DOCKER_HOST} login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
-                sh "docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}"
-                sh "docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}"
+                script {
+                    sh "echo ${DOCKER_CREDENTIALS_PSW} | docker -H ${DOCKER_HOST} login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
+                    sh "docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}"
+                    sh "docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}"
+                }
             }
         }
         stage('Deploy') {
             steps {
-                sh "docker -H ${DOCKER_HOST} compose -f docker-compose.yml up -d"
+                script {
+                    sh "docker -H ${DOCKER_HOST} compose -f ./docker-compose.yml down || true"
+                    sh "docker -H ${DOCKER_HOST} compose -f ./docker-compose.yml up -d"
+                }
             }
         }
     }
