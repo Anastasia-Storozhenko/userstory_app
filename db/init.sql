@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS projects (
     PRIMARY KEY (id)
 );
 INSERT INTO projects (name, description) VALUES ('Test Project', 'Description');
+SELECT 'Data inserted successfully' AS message;

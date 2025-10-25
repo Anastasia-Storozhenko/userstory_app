@@ -85,7 +85,7 @@ pipeline {
                 script {
                     sh """
                     docker -H ${DOCKER_HOST} exec userstory-db mariadb -uuserstory_user -puserstory_pass userstory -e \
-                    "SELECT * FROM projects;" || echo 'Database check failed'
+                    "SHOW TABLES; SELECT * FROM projects;" || echo 'Database check failed'
                     """
                 }
             }
