@@ -15,7 +15,7 @@ pipeline {
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-frontend:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-backend:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
-    }
+    } 
     stages {
         stage('Check Docker Host') {
             steps {
