@@ -104,15 +104,11 @@ pipeline {
                 script {
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
-                    curl -s http://backend:8080/projects || echo 'API check failed'
-                    """
-                    sh """
-                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://backend:8080/api/projects || echo 'API check failed'
                     """
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
-                    curl -s -X POST http://backend:8080/projects -H "Content-Type: application/json" -d '{"name":"Test2","description":"Test Description"}' || echo 'POST API check failed'
+                    curl -s -X POST http://backend:8080/api/projects -H "Content-Type: application/json" -d '{"name":"Test2","description":"Test Description"}' || echo 'POST API check failed'
                     """
                     sh """
                     docker -H ${DOCKER_HOST} exec userstory-db mariadb -uuserstory_user -puserstory_pass userstory -e \
@@ -126,19 +122,15 @@ pipeline {
                 script {
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
-                    curl -s http://frontend:80/projects || echo 'Frontend API check failed'
-                    """
-                    sh """
-                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://frontend:80/api/projects || echo 'Frontend API check failed'
                     """
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
-                    curl -s http://192.168.56.20:80/projects || echo 'External frontend API check failed'
+                    curl -s http://192.168.56.20:80/api/projects || echo 'External frontend API check failed'
                     """
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
-                    curl -s http://192.168.56.20:80/api/projects || echo 'External frontend API check failed'
+                    curl -s http://192.168.56.20:80/projects || echo 'Frontend route check failed'
                     """
                 }
             }

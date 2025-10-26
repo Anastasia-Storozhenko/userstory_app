@@ -42,7 +42,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/projects || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/projects || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -54,7 +54,7 @@ services:
     image: anastasiia191006/userstory-frontend:latest
     container_name: userstory-frontend
     environment:
-      REACT_APP_BACKEND_URL: http://192.168.56.20:80
+      REACT_APP_BACKEND_URL: http://192.168.56.20:80/api
     ports:
       - "80:80"
     depends_on:
