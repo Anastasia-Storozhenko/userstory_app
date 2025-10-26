@@ -75,6 +75,13 @@ pipeline {
                 }
             }
         }
+        stage('Check Database Logs') {
+            steps {
+                script {
+                    sh "docker -H ${DOCKER_HOST} logs userstory-db || echo 'No database logs available'"
+                }
+            }
+        }
         stage('Check Backend Logs') {
             steps {
                 script {
@@ -102,6 +109,14 @@ pipeline {
                     sh """
                     docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
                     curl -s http://backend:8080/api/projects || echo 'API check failed'
+                    """
+                    sh """
+                    docker -H ${DOCKER_HOST} run --rm --network userstory-app-pipeline_app-network curlimages/curl \
+                    curl -s -X POST http://backend:8080/projects -H "Content-Type: application/json" -d '{"name":"Test2","description":"Test Description"}' || echo 'POST API check failed'
+                    """
+                    sh """
+                    docker -H ${DOCKER_HOST} exec userstory-db mariadb -uuserstory_user -puserstory_pass userstory -e \
+                    "SELECT * FROM projects WHERE name='Test2';" || echo 'Database check after POST failed'
                     """
                 }
             }

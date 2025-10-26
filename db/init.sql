@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS projects (
     description VARCHAR(255),
     PRIMARY KEY (id)
 );
-INSERT INTO projects (name, description) VALUES ('Test Project', 'Description');
-SELECT 'Data inserted successfully' AS message;
+INSERT IGNORE INTO projects (name, description) VALUES ('Test Project', 'Description');
+SELECT 'Data inserted successfully' AS message, (SELECT COUNT(*) FROM projects) AS project_count;
