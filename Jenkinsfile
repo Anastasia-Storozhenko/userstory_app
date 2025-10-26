@@ -15,12 +15,14 @@ pipeline {
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-frontend:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-backend:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
-    } 
+        COMPOSE_HTTP_TIMEOUT = '120'
+    }
     stages {
         stage('Check Docker Host') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} info || exit 1"
+                    sh "docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1"
+                    sh "docker -H ${DOCKER_HOST} network ls || exit 1"
                 }
             }
         }
@@ -65,7 +67,7 @@ pipeline {
             steps {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d || true"
+                    sh "docker-compose -H ${DOCKER_HOST} -f ./docker-compose.yml up -d --force-recreate || true"
                     sh "sleep 180"
                     sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                     sh "docker -H ${DOCKER_HOST} inspect userstory-backend | grep Health || echo 'No backend health status'"
@@ -85,7 +87,7 @@ pipeline {
                 script {
                     sh """
                     docker -H ${DOCKER_HOST} exec userstory-db mariadb -uuserstory_user -puserstory_pass userstory -e \
-                    "SHOW TABLES; SELECT * FROM projects;" || echo 'Database check failed'
+                    "SHOW TABLES; SELECT * FROM projects; SELECT 'Data count:', COUNT(*) FROM projects;" || echo 'Database check failed'
                     """
                 }
             }
