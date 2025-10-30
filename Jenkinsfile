@@ -57,7 +57,7 @@ pipeline {
 
                             cd backend
                             mvn verify sonar:sonar \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app \
+                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
                                 -Dsonar.token=${SONAR_TOKEN} || true
