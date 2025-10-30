@@ -38,32 +38,33 @@ pipeline {
             }
         }
                 // SonarCloud Analysis
-        stage('SonarCloud Analysis') {
+       stage('SonarCloud Analysis') {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                            # Кешуємо node_modules
+                            # Кеш node_modules
                             if [ ! -d "frontend/node_modules" ]; then
-                                echo "Installing node_modules..."
                                 cd frontend && npm ci
                             else
                                 echo "Using cached node_modules"
                             fi
 
-                            # Кешуємо sonar cache
+                            # Кеш sonar
                             export SONAR_USER_HOME=/var/lib/jenkins/.sonar
                             mkdir -p $SONAR_USER_HOME/cache
 
+                            # Бекенд
                             cd backend
                             mvn verify sonar:sonar \
                                 -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
                                 -Dsonar.token=${SONAR_TOKEN} || true
 
+                            # Фронтенд — з таймаутами
                             cd ../frontend
+                            export NODE_OPTIONS="--max_old_space_size=2048"
                             CI=false npm run build
 
                             npm install --save-dev sonar-scanner
@@ -75,13 +76,15 @@ pipeline {
                                 -Dsonar.token=${SONAR_TOKEN} \
                                 -Dsonar.sources=src \
                                 -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
-                                -Dsonar.sourceEncoding=UTF-8 || true
+                                -Dsonar.sourceEncoding=UTF-8 \
+                                -Dsonar.ws.timeout=300 \
+                                -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
+                                -X || echo "Frontend Sonar failed" || true
                         '''
                     }
                 }
             }
         }
-
 
         stage('Build Frontend') {
             steps {
