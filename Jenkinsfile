@@ -37,45 +37,44 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-        // SonarCloud Analysis
+                // SonarCloud Analysis
         stage('SonarCloud Analysis') {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                            echo "Запуск аналізу SonarCloud..."
+                            # Кешуємо node_modules
+                            if [ ! -d "frontend/node_modules" ]; then
+                                echo "Installing node_modules..."
+                                cd frontend && npm ci
+                            else
+                                echo "Using cached node_modules"
+                            fi
 
-                            # Аналіз бекенду (Maven)
+                            # Кешуємо sonar cache
+                            export SONAR_USER_HOME=/var/lib/jenkins/.sonar
+                            mkdir -p $SONAR_USER_HOME/cache
+
                             cd backend
                             mvn verify sonar:sonar \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.organization=${SONAR_ORG} \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_TOKEN} \
-                                -Dsonar.java.binaries=target/classes \
-                                -Dsonar.sources=src/main/java \
-                                -Dsonar.tests=src/test/java \
-                                -Dsonar.junit.reportPaths=target/surefire-reports \
-                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml || echo "SonarCloud backend failed"
+                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app \
+                                -Dsonar.organization=anastasia-storozhenko \
+                                -Dsonar.host.url=https://sonarcloud.io \
+                                -Dsonar.token=${SONAR_TOKEN} || true
 
-                            # Аналіз фронтенду (npm + sonar-scanner)
                             cd ../frontend
-                            npm install
                             CI=false npm run build
 
-                            # Встановлюємо sonar-scanner (якщо ще немає)
                             npm install --save-dev sonar-scanner
 
-                            # Запускаємо сканер
                             npx sonar-scanner \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY}_frontend \
-                                -Dsonar.organization=${SONAR_ORG} \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_TOKEN} \
+                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                -Dsonar.organization=anastasia-storozhenko \
+                                -Dsonar.host.url=https://sonarcloud.io \
+                                -Dsonar.token=${SONAR_TOKEN} \
                                 -Dsonar.sources=src \
-                                -Dsonar.tests=src \
-                                -Dsonar.test.inclusions="**/*.test.js,**/*.test.jsx" \
-                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info || echo "SonarCloud frontend failed"
+                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
+                                -Dsonar.sourceEncoding=UTF-8 || true
                         '''
                     }
                 }
