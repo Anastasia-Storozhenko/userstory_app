@@ -20,7 +20,7 @@ pipeline {
         // SonarCloud
         SONAR_TOKEN = credentials('sonarcloud-token')
         SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
-        SONAR_ORG = 'Anastasia-Storozhenko'  
+        SONAR_ORG = 'anastasia-storozhenko'
         SONAR_HOST_URL = 'https://sonarcloud.io'
     }
     stages {
