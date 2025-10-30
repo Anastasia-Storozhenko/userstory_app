@@ -16,6 +16,12 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/anastasiia191006/userstory-backend:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
+
+        // SonarCloud
+        SONAR_TOKEN = credentials('sonarcloud-token')
+        SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
+        SONAR_ORG = 'Anastasia-Storozhenko'  
+        SONAR_HOST_URL = 'https://sonarcloud.io'
     }
     stages {
         stage('Check Docker Host') {
@@ -31,6 +37,52 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
+        // SonarCloud Analysis
+        stage('SonarCloud Analysis') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            echo "Запуск аналізу SonarCloud..."
+
+                            # Аналіз бекенду (Maven)
+                            cd backend
+                            mvn verify sonar:sonar \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.organization=${SONAR_ORG} \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_TOKEN} \
+                                -Dsonar.java.binaries=target/classes \
+                                -Dsonar.sources=src/main/java \
+                                -Dsonar.tests=src/test/java \
+                                -Dsonar.junit.reportPaths=target/surefire-reports \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml || echo "SonarCloud backend failed"
+
+                            # Аналіз фронтенду (npm + sonar-scanner)
+                            cd ../frontend
+                            npm install
+                            npm run build
+
+                            # Встановлюємо sonar-scanner (якщо ще немає)
+                            npm install --save-dev sonar-scanner
+
+                            # Запускаємо сканер
+                            npx sonar-scanner \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY}_frontend \
+                                -Dsonar.organization=${SONAR_ORG} \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_TOKEN} \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions="**/*.test.js,**/*.test.jsx" \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info || echo "SonarCloud frontend failed"
+                        '''
+                    }
+                }
+            }
+        }
+
+
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
