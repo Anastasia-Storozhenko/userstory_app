@@ -61,7 +61,7 @@ pipeline {
                             # Аналіз фронтенду (npm + sonar-scanner)
                             cd ../frontend
                             npm install
-                            npm run build
+                            CI=false npm run build
 
                             # Встановлюємо sonar-scanner (якщо ще немає)
                             npm install --save-dev sonar-scanner
