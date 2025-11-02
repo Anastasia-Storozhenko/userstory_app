@@ -47,10 +47,9 @@ pipeline {
             }
         }
         
-        // Terraform Infrastructure
-        stage('Terraform Init & Plan') {
+       stage('Terraform Init & Plan') {
             steps {
-                dir('.') {  // Змінив на корінь, бо Terraform файли там.
+                dir('.') {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                         string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
@@ -60,7 +59,10 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            terraform --version  # Перевірка версії
+                            echo "Current directory contents:"
+                            ls -la
+                            
+                            terraform --version
                             terraform init
                             terraform plan -out=tfplan -var="project_prefix=${TF_VAR_project_prefix}" -var="env_name=${TF_VAR_env_name}"
                         '''
@@ -71,7 +73,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir('.') {  // Змінив на корінь.
+                dir('.') {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                         string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
