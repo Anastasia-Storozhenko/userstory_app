@@ -4,7 +4,7 @@ pipeline {
         nodejs 'nodejs-20.11.0'
         jdk 'jdk17'
         maven 'maven-3.6.3'
-        terraform 'terraform-1.6.0'
+        terraform 'terraform-1.13.4'
     }
     environment {
         DB_USER = credentials('db-credentials')
@@ -46,7 +46,8 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-       // НОВИЙ ЕТАП: Terraform Infrastructure
+        
+        // Terraform Infrastructure
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform') {
@@ -59,8 +60,9 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
+                            terraform --version  # Перевірка версії
                             terraform init
-                            terraform plan -out=tfplan -var="project_prefix=userstory" -var="env_name=dev"
+                            terraform plan -out=tfplan -var="project_prefix=${TF_VAR_project_prefix}" -var="env_name=${TF_VAR_env_name}"
                         '''
                     }
                 }
@@ -79,7 +81,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            terraform apply tfplan
+                            terraform apply -auto-approve tfplan
                         '''
                     }
                 }
