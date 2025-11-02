@@ -4,6 +4,7 @@ pipeline {
         nodejs 'nodejs-20.11.0'
         jdk 'jdk17'
         maven 'maven-3.6.3'
+        terraform 'terraform-1.6.0'
     }
     environment {
         DB_USER = credentials('db-credentials')
@@ -22,6 +23,14 @@ pipeline {
         SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
         SONAR_ORG = 'anastasia-storozhenko'
         SONAR_HOST_URL = 'https://sonarcloud.io'
+
+        TF_VAR_project_prefix = 'userstory'
+        TF_VAR_env_name = 'dev'
+        TF_VAR_my_ip_for_ssh = '45.89.90.187/32'  
+        TF_VAR_vpc_cidr = '10.0.0.0/16'
+        TF_VAR_backend_port = '8080'
+        TF_VAR_db_port = '3306'
+        TF_VAR_private_key_path = './terraform/userstory_key'  
     }
     stages {
         stage('Check Docker Host') {
@@ -81,6 +90,46 @@ pipeline {
                                 -Dsonar.ws.timeout=300 \
                                 -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
                                 -X || echo "Frontend Sonar failed" || true
+                        '''
+                    }
+                }
+            }
+        }
+
+       // НОВИЙ ЕТАП: Terraform Infrastructure
+        stage('Terraform Init & Plan') {
+            steps {
+                dir('terraform') {
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
+                            
+                            terraform init
+                            terraform plan -out=tfplan -var="project_prefix=userstory" -var="env_name=dev"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('terraform') {
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
+                            
+                            terraform apply tfplan
                         '''
                     }
                 }
