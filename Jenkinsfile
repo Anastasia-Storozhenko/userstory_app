@@ -170,12 +170,16 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
+                            # Створюємо репозиторії, якщо їх немає
+                            aws ecr describe-repositories --repository-names userstory-frontend-repo || aws ecr create-repository --repository-name userstory-frontend-repo
+                            aws ecr describe-repositories --repository-names userstory-backend-repo || aws ecr create-repository --repository-name userstory-backend-repo
+                            
                             # Отримуємо токен авторизації для ECR
                             aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
                             
                             # Пушимо образи
-                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend:latest
-                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend:latest
+                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
+                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
                         '''
                     }
                 }
