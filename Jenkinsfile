@@ -49,7 +49,7 @@ pipeline {
         
        stage('Terraform Init & Plan') {
             steps {
-                dir('.') {
+                dir('terraform') {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                         string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
@@ -73,7 +73,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir('.') {
+                dir('terraform') {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                         string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
