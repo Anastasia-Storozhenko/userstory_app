@@ -101,8 +101,8 @@ pipeline {
                     fi
 
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip -o awscliv2.zip  # Додано -o для примусової заміни
-                    sudo ./aws/install
+                    unzip -o awscliv2.zip  # Примусова заміна файлів
+                    sudo ./aws/install --update  # Додано --update
                     rm -rf awscliv2.zip aws
                 '''
             }
