@@ -46,8 +46,6 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-
-
        // НОВИЙ ЕТАП: Terraform Infrastructure
         stage('Terraform Init & Plan') {
             steps {
