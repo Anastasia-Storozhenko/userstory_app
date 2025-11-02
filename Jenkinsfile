@@ -161,9 +161,23 @@ pipeline {
         stage('Push Docker Images') {
             steps {
                 script {
-                    sh "echo ${DOCKER_CREDENTIALS_PSW} | docker -H ${DOCKER_HOST} login -u ${DOCKER_CREDENTIALS_USR} --password-stdin ${DOCKER_REGISTRY}"
-                    sh "docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}"
-                    sh "docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}"
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
+                            
+                            # Отримуємо токен авторизації для ECR
+                            aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
+                            
+                            # Пушимо образи
+                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend:latest
+                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend:latest
+                        '''
+                    }
                 }
             }
         }
