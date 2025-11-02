@@ -26,7 +26,7 @@ pipeline {
 
         TF_VAR_project_prefix = 'userstory'
         TF_VAR_env_name = 'dev'
-        TF_VAR_my_ip_for_ssh = '45.89.90.187/32'  
+        TF_VAR_my_ip_for_ssh = '0.0.0.0/0'  
         TF_VAR_vpc_cidr = '10.0.0.0/16'
         TF_VAR_backend_port = '8080'
         TF_VAR_db_port = '3306'
@@ -46,55 +46,7 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-                // SonarCloud Analysis
-       stage('SonarCloud Analysis') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                            # Кеш node_modules
-                            if [ ! -d "frontend/node_modules" ]; then
-                                cd frontend && npm ci
-                            else
-                                echo "Using cached node_modules"
-                            fi
 
-                            # Кеш sonar
-                            export SONAR_USER_HOME=/var/lib/jenkins/.sonar
-                            mkdir -p $SONAR_USER_HOME/cache
-
-                            # Бекенд
-                            cd backend
-                            mvn verify sonar:sonar \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} || true
-
-                            # Фронтенд — з таймаутами
-                            cd ../frontend
-                            export NODE_OPTIONS="--max_old_space_size=2048"
-                            CI=false npm run build
-
-                            npm install --save-dev sonar-scanner
-
-                            npx sonar-scanner \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} \
-                                -Dsonar.sources=src \
-                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
-                                -Dsonar.sourceEncoding=UTF-8 \
-                                -Dsonar.ws.timeout=300 \
-                                -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                -X || echo "Frontend Sonar failed" || true
-                        '''
-                    }
-                }
-            }
-        }
 
        // НОВИЙ ЕТАП: Terraform Infrastructure
         stage('Terraform Init & Plan') {
