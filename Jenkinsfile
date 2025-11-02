@@ -86,7 +86,7 @@ pipeline {
             }
         }
 
-        stage('Install AWS CLI') {
+        stage('Install AWS CLI') { 
             steps {
                 sh '''
                     # Встановлюємо unzip залежно від дистрибутива
