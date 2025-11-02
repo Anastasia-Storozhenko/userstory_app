@@ -12,8 +12,8 @@ pipeline {
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:${env.BUILD_NUMBER}"
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:${env.BUILD_NUMBER}"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
 
@@ -169,16 +169,21 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            # Створюємо репозиторії, якщо їх немає
-                            aws ecr describe-repositories --repository-names userstory-frontend-repo || aws ecr create-repository --repository-name userstory-frontend-repo
-                            aws ecr describe-repositories --repository-names userstory-backend-repo || aws ecr create-repository --repository-name userstory-backend-repo
+                            aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY} || true
                             
-                            # Отримуємо токен авторизації для ECR
-                            aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
+                            # Перевірка та пуш фронтенду
+                            if ! aws ecr describe-images --repository-name userstory-frontend-repo --image-ids imageTag=${env.BUILD_NUMBER} --region us-east-1 >/dev/null 2>&1; then
+                                docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}
+                            else
+                                echo "Tag ${env.BUILD_NUMBER} already exists in userstory-frontend-repo, skipping push"
+                            fi
                             
-                            # Пушимо образи
-                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
-                            docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
+                            # Перевірка та пуш бекенду
+                            if ! aws ecr describe-images --repository-name userstory-backend-repo --image-ids imageTag=${env.BUILD_NUMBER} --region us-east-1 >/dev/null 2>&1; then
+                                docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}
+                            else
+                                echo "Tag ${env.BUILD_NUMBER} already exists in userstory-backend-repo, skipping push"
+                            fi
                         '''
                     }
                 }
