@@ -89,6 +89,17 @@ pipeline {
         stage('Install AWS CLI') {
             steps {
                 sh '''
+                    # Встановлюємо unzip залежно від дистрибутива
+                    if [ -f /etc/debian_version ]; then
+                        sudo apt-get update
+                        sudo apt-get install -y unzip
+                    elif [ -f /etc/redhat-release ]; then
+                        sudo yum install -y unzip
+                    else
+                        echo "Невідомий дистрибутив, встановіть unzip вручну"
+                        exit 1
+                    fi
+
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
                     unzip awscliv2.zip
                     sudo ./aws/install
