@@ -90,6 +90,33 @@ pipeline {
             }
         }
 
+        stage('Validate Infrastructure') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
+                        
+                        # Перевір VPC
+                        aws ec2 describe-vpcs --filters "Name=tag:Name,Values=userstory-vpc" || echo "VPC not found"
+                        
+                        # Перевір EC2
+                        aws ec2 describe-instances --filters "Name=tag:Name,Values=userstory-frontend" || echo "EC2 not found"
+                        
+                        # Перевір RDS
+                        aws rds describe-db-instances --db-instance-identifier userstory-db || echo "RDS not found"
+                        
+                        # Перевір ECR
+                        aws ecr describe-repositories --repository-names userstory-frontend || echo "ECR not found"
+                    '''
+                }
+            }
+        }
+
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
