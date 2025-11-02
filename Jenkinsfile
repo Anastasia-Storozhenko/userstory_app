@@ -12,9 +12,8 @@ pipeline {
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
-        DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend:latest"
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend:latest"
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
 

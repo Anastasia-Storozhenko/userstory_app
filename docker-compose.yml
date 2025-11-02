@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   frontend:
-    image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend:latest
+    image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
     ports:
       - "80:80"  # Публічний доступ до фронтенду
     networks:
@@ -12,7 +12,7 @@ services:
       - REACT_APP_API_URL=http://backend:8080/api  # Внутрішня URL для API
 
   backend:
-    image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend:latest
+    image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
     ports:
       - "8080:8080"  # Публічний доступ до бекенду
     networks:
