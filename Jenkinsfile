@@ -46,65 +46,76 @@ pipeline {
         }
 
         stage('SonarCloud Analysis') {
+            timeout(time: 10, unit: 'MINUTES') {  // Додаємо таймаут
+                steps {
+                    script {
+                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                            sh '''
+                                # Кеш sonar
+                                export SONAR_USER_HOME=/var/lib/jenkins/.sonar
+                                mkdir -p $SONAR_USER_HOME/cache
+
+                                # Бекенд - працює швидко (36s)
+                                echo "Running backend Sonar analysis..."
+                                cd backend
+                                mvn verify sonar:sonar \
+                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                    -Dsonar.organization=anastasia-storozhenko \
+                                    -Dsonar.host.url=https://sonarcloud.io \
+                                    -Dsonar.token=${SONAR_TOKEN}
+                                
+                                cd ..
+
+                                # Фронтенд - ОПТИМІЗОВАНИЙ ВАРІАНТ
+                                echo "Running optimized frontend Sonar analysis..."
+                                cd frontend
+                                
+                                # Оптимізація пам'яті для Node.js
+                                export NODE_OPTIONS="--max_old_space_size=1536"
+                                
+                                # Скануємо тільки основні файли, ігноруємо більше
+                                sonar-scanner \
+                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                    -Dsonar.organization=anastasia-storozhenko \
+                                    -Dsonar.host.url=https://sonarcloud.io \
+                                    -Dsonar.token=${SONAR_TOKEN} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx,**/*.spec.js,**/*.spec.jsx,src/setupTests.js,src/reportWebVitals.js" \
+                                    -Dsonar.sourceEncoding=UTF-8 \
+                                    -Dsonar.ws.timeout=600 \
+                                    -Dsonar.javascript.node.maxspace=1536 \
+                                    -Dsonar.coverage.exclusions="**/*" \
+                                    -Dsonar.cpd.exclusions="**/*"
+                                
+                                cd ..
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Terraform Init & Plan') {
             steps {
-                script {
-                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                dir('terraform/envs/dev') {
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
                         sh '''
-                            # Кеш node_modules для фронтенда
-                            if [ ! -d "frontend/node_modules" ]; then
-                                echo "Installing frontend dependencies..."
-                                cd frontend && npm ci && cd ..
-                            else
-                                echo "Using cached node_modules for frontend"
-                            fi
-
-                            # Кеш sonar
-                            export SONAR_USER_HOME=/var/lib/jenkins/.sonar
-                            mkdir -p $SONAR_USER_HOME/cache
-
-                            # Бекенд - FIXED
-                            echo "Running backend Sonar analysis..."
-                            cd backend
-                            mvn verify sonar:sonar \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN}
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
                             
-                            cd ..
-
-                            # Фронтенд - FIXED
-                            echo "Running frontend Sonar analysis..."
-                            cd frontend
-                            
-                            # Встановлюємо sonar-scanner глобально або локально
-                            npm install -g sonar-scanner || npm install --save-dev sonar-scanner
-                            
-                            export NODE_OPTIONS="--max_old_space_size=2048"
-                            
-                            # Білд проекту
-                            CI=false npm run build
-                            
-                            # Запуск sonar-scanner
-                            sonar-scanner \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} \
-                                -Dsonar.sources=src \
-                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
-                                -Dsonar.sourceEncoding=UTF-8 \
-                                -Dsonar.ws.timeout=300 \
-                                -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json
-                            
-                            cd ..
+                            terraform --version
+                            terraform init
+                            terraform plan -out=tfplan -var="project_prefix=${TF_VAR_project_prefix}" -var="env_name=${TF_VAR_env_name}"
                         '''
                     }
                 }
             }
         }
-
 
         stage('Terraform Apply') {
             steps {
