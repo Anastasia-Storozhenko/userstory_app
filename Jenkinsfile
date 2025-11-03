@@ -46,50 +46,41 @@ pipeline {
         }
 
         stage('SonarCloud Analysis') {
-            timeout(time: 10, unit: 'MINUTES') {  // Додаємо таймаут
-                steps {
-                    script {
-                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                # Кеш sonar
-                                export SONAR_USER_HOME=/var/lib/jenkins/.sonar
-                                mkdir -p $SONAR_USER_HOME/cache
-
-                                # Бекенд - працює швидко (36s)
-                                echo "Running backend Sonar analysis..."
-                                cd backend
-                                mvn verify sonar:sonar \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN}
-                                
-                                cd ..
-
-                                # Фронтенд - ОПТИМІЗОВАНИЙ ВАРІАНТ
-                                echo "Running optimized frontend Sonar analysis..."
-                                cd frontend
-                                
-                                # Оптимізація пам'яті для Node.js
-                                export NODE_OPTIONS="--max_old_space_size=1536"
-                                
-                                # Скануємо тільки основні файли, ігноруємо більше
-                                sonar-scanner \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN} \
-                                    -Dsonar.sources=src \
-                                    -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx,**/*.spec.js,**/*.spec.jsx,src/setupTests.js,src/reportWebVitals.js" \
-                                    -Dsonar.sourceEncoding=UTF-8 \
-                                    -Dsonar.ws.timeout=600 \
-                                    -Dsonar.javascript.node.maxspace=1536 \
-                                    -Dsonar.coverage.exclusions="**/*" \
-                                    -Dsonar.cpd.exclusions="**/*"
-                                
-                                cd ..
-                            '''
+            parallel {
+                stage('Backend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    cd backend
+                                    mvn verify sonar:sonar \
+                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                        -Dsonar.organization=anastasia-storozhenko \
+                                        -Dsonar.host.url=https://sonarcloud.io \
+                                        -Dsonar.token=${SONAR_TOKEN}
+                                '''
+                            }
+                        }
+                    }
+                }
+                
+                stage('Frontend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    cd frontend
+                                    export NODE_OPTIONS="--max_old_space_size=1536"
+                                    sonar-scanner \
+                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                        -Dsonar.organization=anastasia-storozhenko \
+                                        -Dsonar.host.url=https://sonarcloud.io \
+                                        -Dsonar.token=${SONAR_TOKEN} \
+                                        -Dsonar.sources=src \
+                                        -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*" \
+                                        -Dsonar.javascript.node.maxspace=1536
+                                '''
+                            }
                         }
                     }
                 }
