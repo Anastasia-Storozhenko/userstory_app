@@ -68,7 +68,7 @@ pipeline {
                                 -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN}  true
+                                -Dsonar.token=${SONAR_TOKEN} || true
 
                             # Фронтенд — з таймаутами
                             cd ../frontend
@@ -87,7 +87,7 @@ pipeline {
                                 -Dsonar.sourceEncoding=UTF-8 \
                                 -Dsonar.ws.timeout=300 \
                                 -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                -X  echo "Frontend Sonar failed" || true
+                                -X || true
                         '''
                     }
                 }
