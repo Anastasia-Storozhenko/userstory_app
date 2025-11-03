@@ -12,8 +12,8 @@ pipeline {
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:${env.BUILD_NUMBER}"
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:${env.BUILD_NUMBER}"
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
 
@@ -157,7 +157,7 @@ pipeline {
             }
         }
 
-        stage('Push Docker Images') {
+       stage('Push Docker Images') {
             steps {
                 script {
                     withCredentials([
@@ -169,21 +169,76 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY} || true
+                            # Функція для перевірки, чи можна пушити образ
+                            check_push_possible() {
+                                local repo_name=$1
+                                
+                                # Перевіряємо, чи існує репозиторій
+                                if aws ecr describe-repositories --repository-names "$repo_name" >/dev/null 2>&1; then
+                                    echo "Repository $repo_name exists, checking immutable policy..."
+                                    
+                                    # Перевіряємо, чи є образ з тегом latest
+                                    local existing_image=$(aws ecr describe-images --repository-name "$repo_name" --image-ids imageTag=latest 2>/dev/null || echo "NOT_FOUND")
+                                    
+                                    if [ "$existing_image" != "NOT_FOUND" ]; then
+                                        echo "Image with tag 'latest' already exists in $repo_name"
+                                        
+                                        # Перевіряємо політику immutable tags
+                                        local policy=$(aws ecr get-repository-policy --repository-name "$repo_name" 2>/dev/null || echo "NO_POLICY")
+                                        
+                                        if echo "$policy" | grep -q "IMMUTABLE"; then
+                                            echo "Repository $repo_name has IMMUTABLE policy - cannot push to existing tag"
+                                            return 1
+                                        else
+                                            echo "Repository $repo_name does not have IMMUTABLE policy - can push"
+                                            return 0
+                                        fi
+                                    else
+                                        echo "Repository $repo_name exists but no 'latest' tag found - can push"
+                                        return 0
+                                    fi
+                                else
+                                    echo "Repository $repo_name does not exist - will create and push"
+                                    return 0
+                                fi
+                            }
                             
-                            # Перевірка та пуш фронтенду
-                            if ! aws ecr describe-images --repository-name userstory-frontend-repo --image-ids imageTag=${env.BUILD_NUMBER} --region us-east-1 >/dev/null 2>&1; then
-                                docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}
-                            else
-                                echo "Tag ${env.BUILD_NUMBER} already exists in userstory-frontend-repo, skipping push"
+                            # Створюємо репозиторії, якщо їх немає
+                            echo "Checking frontend repository..."
+                            if ! aws ecr describe-repositories --repository-names userstory-frontend-repo >/dev/null 2>&1; then
+                                echo "Creating userstory-frontend-repo..."
+                                aws ecr create-repository --repository-name userstory-frontend-repo
                             fi
                             
-                            # Перевірка та пуш бекенду
-                            if ! aws ecr describe-images --repository-name userstory-backend-repo --image-ids imageTag=${env.BUILD_NUMBER} --region us-east-1 >/dev/null 2>&1; then
-                                docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}
-                            else
-                                echo "Tag ${env.BUILD_NUMBER} already exists in userstory-backend-repo, skipping push"
+                            echo "Checking backend repository..."
+                            if ! aws ecr describe-repositories --repository-names userstory-backend-repo >/dev/null 2>&1; then
+                                echo "Creating userstory-backend-repo..."
+                                aws ecr create-repository --repository-name userstory-backend-repo
                             fi
+                            
+                            # Отримуємо токен авторизації для ECR
+                            aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
+                            
+                            # Перевіряємо та пушимо образи
+                            echo "=== Checking if we can push images ==="
+                            
+                            # Frontend
+                            if check_push_possible "userstory-frontend-repo"; then
+                                echo " Pushing frontend image..."
+                                docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
+                            else
+                                echo " Skipping frontend push - immutable policy detected"
+                            fi
+                            
+                            # Backend
+                            if check_push_possible "userstory-backend-repo"; then
+                                echo "Pushing backend image..."
+                                docker -H tcp://192.168.56.20:2375 push 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
+                            else
+                                echo "⏭Skipping backend push - immutable policy detected"
+                            fi
+                            
+                            echo "=== Push process completed ==="
                         '''
                     }
                 }
