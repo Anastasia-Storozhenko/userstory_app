@@ -45,6 +45,55 @@ pipeline {
             }
         }
 
+        stage('SonarCloud Analysis') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            # Кеш node_modules
+                            if [ ! -d "frontend/node_modules" ]; then
+                                cd frontend && npm ci
+                            else
+                                echo "Using cached node_modules"
+                            fi
+
+                            # Кеш sonar
+                            export SONAR_USER_HOME=/var/lib/jenkins/.sonar
+                            mkdir -p $SONAR_USER_HOME/cache
+
+                            # Бекенд
+                            cd backend
+                            mvn verify sonar:sonar \
+                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                -Dsonar.organization=anastasia-storozhenko \
+                                -Dsonar.host.url=https://sonarcloud.io \
+                                -Dsonar.token=${SONAR_TOKEN}  true
+
+                            # Фронтенд — з таймаутами
+                            cd ../frontend
+                            export NODE_OPTIONS="--max_old_space_size=2048"
+                            CI=false npm run build
+
+                            npm install --save-dev sonar-scanner
+
+                            npx sonar-scanner \
+                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                -Dsonar.organization=anastasia-storozhenko \
+                                -Dsonar.host.url=https://sonarcloud.io \
+                                -Dsonar.token=${SONAR_TOKEN} \
+                                -Dsonar.sources=src \
+                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
+                                -Dsonar.sourceEncoding=UTF-8 \
+                                -Dsonar.ws.timeout=300 \
+                                -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
+                                -X  echo "Frontend Sonar failed" || true
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
@@ -177,19 +226,19 @@ pipeline {
                                 local image_name=$1
                                 local image_type=$2
                                 
-                                echo "🔄 Attempting to push $image_type..."
+                                echo "Attempting to push $image_type..."
                                 
                                 # Пробуємо зробити push
                                 if docker -H tcp://192.168.56.20:2375 push "$image_name"; then
-                                    echo "✅ Successfully pushed $image_type"
+                                    echo "Successfully pushed $image_type"
                                 else
                                     # Якщо push впав, перевіряємо чи це через immutable tags
                                     local push_output=$(docker -H tcp://192.168.56.20:2375 push "$image_name" 2>&1 || true)
                                     
                                     if echo "$push_output" | grep -q "immutable"; then
-                                        echo "⏭️ Skipping $image_type - immutable tags detected"
+                                        echo "Skipping $image_type - immutable tags detected"
                                     else
-                                        echo "❌ Failed to push $image_type for unknown reason"
+                                        echo "Failed to push $image_type for unknown reason"
                                         exit 1
                                     fi
                                 fi
@@ -199,7 +248,7 @@ pipeline {
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
-                            echo "🎉 Push process completed"
+                            echo "Push process completed"
                         '''
                     }
                 }
