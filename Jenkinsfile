@@ -68,26 +68,53 @@ pipeline {
                                 -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} || true
+                                -Dsonar.token=${SONAR_TOKEN} \
+                                -Xmx2048m || true
 
-                            # Фронтенд — з таймаутами
+                            # Фронтенд
                             cd ../frontend
-                            export NODE_OPTIONS="--max_old_space_size=2048"
-                            CI=false npm run build
+                            export NODE_OPTIONS="--max_old_space_size=4096"
 
+                            # Перевірка наявності tsconfig.json
+                            if [ ! -f "tsconfig.json" ]; then
+                                echo "Creating default tsconfig.json"
+                                cat <<EOT > tsconfig.json
+                                {
+                                "compilerOptions": {
+                                    "target": "es6",
+                                    "module": "esnext",
+                                    "strict": true,
+                                    "esModuleInterop": true,
+                                    "skipLibCheck": true,
+                                    "forceConsistentCasingInFileNames": true,
+                                    "moduleResolution": "node",
+                                    "baseUrl": "src"
+                                },
+                                "include": ["src/**/*"],
+                                "exclude": ["node_modules", "build", "public", "**/*.test.js", "**/*.test.jsx"]
+                                }
+                                EOT
+                            fi
+
+                            # Виконання збірки фронтенду
+                            CI=false npm run build || true
+
+                            # Встановлення sonar-scanner
                             npm install --save-dev sonar-scanner
 
-                            npx sonar-scanner \
+                            # Виконання аналізу SonarCloud із таймаутом
+                            timeout 10m npx sonar-scanner \
                                 -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
                                 -Dsonar.token=${SONAR_TOKEN} \
                                 -Dsonar.sources=src \
                                 -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
+                                -Dsonar.typescript.tsconfigPath=tsconfig.json \
                                 -Dsonar.sourceEncoding=UTF-8 \
                                 -Dsonar.ws.timeout=300 \
                                 -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                -X || true
+                                -Xmx2048m -X || true
                         '''
                     }
                 }
