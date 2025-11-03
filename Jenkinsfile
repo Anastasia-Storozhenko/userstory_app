@@ -63,13 +63,13 @@ pipeline {
 
                             # Бекенд
                             cd backend
+                            export MAVEN_OPTS="-Xmx2048m"
                             mvn verify sonar:sonar \
                                 -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
                                 -Dsonar.organization=anastasia-storozhenko \
                                 -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} \
-                                -Xmx2048m || true
+                                -Dsonar.token=${SONAR_TOKEN} || true
 
                             # Фронтенд
                             cd ../frontend
@@ -78,29 +78,29 @@ pipeline {
                             # Перевірка наявності tsconfig.json
                             if [ ! -f "tsconfig.json" ]; then
                                 echo "Creating default tsconfig.json"
-                                cat <<EOT > tsconfig.json
-                                {
-                                "compilerOptions": {
-                                    "target": "es6",
-                                    "module": "esnext",
-                                    "strict": true,
-                                    "esModuleInterop": true,
-                                    "skipLibCheck": true,
-                                    "forceConsistentCasingInFileNames": true,
-                                    "moduleResolution": "node",
-                                    "baseUrl": "src"
-                                },
-                                "include": ["src/**/*"],
-                                "exclude": ["node_modules", "build", "public", "**/*.test.js", "**/*.test.jsx"]
-                                }
-                                EOT
+                                cat << EOT > tsconfig.json
+        {
+        "compilerOptions": {
+            "target": "es6",
+            "module": "esnext",
+            "strict": true,
+            "esModuleInterop": true,
+            "skipLibCheck": true,
+            "forceConsistentCasingInFileNames": true,
+            "moduleResolution": "node",
+            "baseUrl": "src"
+        },
+        "include": ["src/**/*"],
+        "exclude": ["node_modules", "build", "public", "**/*.test.js", "**/*.test.jsx"]
+        }
+        EOT
                             fi
 
                             # Виконання збірки фронтенду
                             CI=false npm run build || true
 
                             # Встановлення sonar-scanner
-                            npm install --save-dev sonar-scanner
+                            npm install --save-dev sonar-scanner@latest
 
                             # Виконання аналізу SonarCloud із таймаутом
                             timeout 10m npx sonar-scanner \
@@ -112,15 +112,15 @@ pipeline {
                                 -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
                                 -Dsonar.typescript.tsconfigPath=tsconfig.json \
                                 -Dsonar.sourceEncoding=UTF-8 \
-                                -Dsonar.ws.timeout=300 \
+                                -Dsonar.ws.timeout=600 \
                                 -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
+                                -Dsonar.scanner.skipSystemTruststore=true \
                                 -Xmx2048m -X || true
                         '''
                     }
                 }
             }
         }
-
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
