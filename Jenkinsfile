@@ -14,9 +14,10 @@ pipeline {
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
-        DOCKER_HOST = 'tcp://ec2-98-92-121-235.compute-1.amazonaws.com:2375'
-        COMPOSE_HTTP_TIMEOUT = '120'
         PUBLIC_IP = 'ec2-98-92-121-235.compute-1.amazonaws.com'
+        SSH_KEY = credentials('ssh-key-id') // Додайте SSH-ключ у Jenkins Credentials
+        SSH_USER = 'ec2-user'
+        COMPOSE_HTTP_TIMEOUT = '120'
 
         SONAR_TOKEN = credentials('sonarcloud-token')
         SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
@@ -35,20 +36,23 @@ pipeline {
         stage('Check Docker Host') {
             steps {
                 script {
-                    sh '''
-                        nc -zv ${PUBLIC_IP} 2375 || { echo "Cannot connect to Docker host"; exit 1; }
-                        docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1
-                    '''
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'sudo systemctl status docker' || { echo "Docker not running on EC2"; exit 1; }
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker info --format "{{.ServerVersion}}"' || { echo "Cannot connect to Docker"; exit 1; }
+                        '''
+                    }
                 }
             }
         }
         stage('Create Docker Network') {
             steps {
                 script {
-                    sh '''
-                        docker -H ${DOCKER_HOST} network inspect app-network || \
-                        docker -H ${DOCKER_HOST} network create app-network
-                    '''
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker network inspect app-network || docker network create app-network'
+                        '''
+                    }
                 }
             }
         }
@@ -60,8 +64,12 @@ pipeline {
         stage('Clean Old Images') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} image prune -f"
-                    sh "docker -H ${DOCKER_HOST} system prune -f --volumes"
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker image prune -f'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker system prune -f --volumes'
+                        '''
+                    }
                 }
             }
         }
@@ -167,32 +175,33 @@ pipeline {
                 script {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')
                     ]) {
                         sh '''
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
-                            aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                            aws ecr get-login-password --region us-east-1 | ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker login --username AWS --password-stdin ${DOCKER_REGISTRY}'
                             cd frontend
                             for i in {1..3}; do
-                                docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} . && break
+                                docker build -t ${FRONTEND_IMAGE} . && break
                                 echo "Frontend build retry $i failed, waiting before next attempt..."
                                 sleep 10
                             done
                             for i in {1..3}; do
-                                docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE} && break
+                                docker push ${FRONTEND_IMAGE} && break
                                 echo "Frontend push retry $i failed, waiting before next attempt..."
                                 sleep 10
                             done
                             cd ../backend
                             for i in {1..3}; do
-                                docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} . && break
+                                docker build -t ${BACKEND_IMAGE} . && break
                                 echo "Backend build retry $i failed, waiting before next attempt..."
                                 sleep 10
                             done
                             for i in {1..3}; do
-                                docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE} && break
+                                docker push ${BACKEND_IMAGE} && break
                                 echo "Backend push retry $i failed, waiting before next attempt..."
                                 sleep 10
                             done
@@ -204,63 +213,56 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sh '''
-                        for i in {1..3}; do
-                            docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
-                            docker -H ${DOCKER_HOST} ps -q | xargs -r docker -H ${DOCKER_HOST} stop || true
-                            docker -H ${DOCKER_HOST} ps -a -q | xargs -r docker -H ${DOCKER_HOST} rm || true
-                            docker -H ${DOCKER_HOST} volume rm userstory-app-pipeline_db-data || true
-                            docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate && break
-                            echo "Retry $i failed, waiting before next attempt..."
-                            sleep 15
-                        done
-                        sleep 180
-                        docker -H ${DOCKER_HOST} ps -a
-                        docker -H ${DOCKER_HOST} logs userstory-frontend || echo "Frontend logs unavailable"
-                        docker -H ${DOCKER_HOST} logs userstory-backend || echo "Backend logs unavailable"
-                        docker -H ${DOCKER_HOST} logs userstory-db || echo "Database logs unavailable"
-                        for i in {1..5}; do
-                            docker -H ${DOCKER_HOST} exec userstory-db mysqladmin ping -h localhost -u root -prootpass && break
-                            echo "Database ping retry $i failed, waiting before next attempt..."
-                            sleep 15
-                        done
-                        docker -H ${DOCKER_HOST} exec userstory-db mysqladmin ping -h localhost -u root -prootpass || echo 'Database ping failed'
-                        for i in {1..5}; do
-                            docker -H ${DOCKER_HOST} exec userstory-backend nc -zv db 3306 && break
-                            echo "Database connection retry $i failed, waiting before next attempt..."
-                            sleep 15
-                        done
-                        docker -H ${DOCKER_HOST} exec userstory-backend nc -zv db 3306 || echo 'Database connection failed'
-                        docker -H ${DOCKER_HOST} exec userstory-backend curl -f http://localhost:8080/actuator/health || echo 'Backend health check failed'
-                        for i in {1..3}; do
-                            curl -s -f http://${PUBLIC_IP}:8080/api/projects && break
-                            echo "API check retry $i failed, waiting before next attempt..."
-                            sleep 10
-                        done
-                        curl -s -f http://${PUBLIC_IP}:8080/api/projects || echo 'API check failed'
-                    '''
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY} docker-compose.yml ${SSH_USER}@${PUBLIC_IP}:/home/ec2-user/docker-compose.yml
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker-compose -f /home/ec2-user/docker-compose.yml down || true'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -q | xargs -r docker stop || true'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -a -q | xargs -r docker rm || true'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker volume rm userstory-app-pipeline_db-data || true'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker-compose -f /home/ec2-user/docker-compose.yml up -d --force-recreate' || { echo "Deployment failed"; exit 1; }
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'sleep 180'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -a'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-frontend || echo "Frontend logs unavailable"'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-backend || echo "Backend logs unavailable"'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-db || echo "Database logs unavailable"'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..5}; do docker exec userstory-db mysqladmin ping -h localhost -u root -prootpass && break; echo "Database ping retry $i failed"; sleep 15; done'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-db mysqladmin ping -h localhost -u root -prootpass || echo "Database ping failed"'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..5}; do docker exec userstory-backend nc -zv db 3306 && break; echo "Database connection retry $i failed"; sleep 15; done'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-backend nc -zv db 3306 || echo "Database connection failed"'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-backend curl -f http://localhost:8080/actuator/health || echo "Backend health check failed"'
+                            for i in {1..3}; do
+                                curl -s -f http://${PUBLIC_IP}:8080/api/projects && break
+                                echo "API check retry $i failed, waiting before next attempt..."
+                                sleep 10
+                            done
+                            curl -s -f http://${PUBLIC_IP}:8080/api/projects || echo 'API check failed'
+                        '''
+                    }
                 }
             }
         }
         stage('Test Application') {
             steps {
                 script {
-                    sh '''
-                        for i in {1..3}; do
-                            docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects && break
-                            echo "API check retry $i failed, waiting before next attempt..."
-                            sleep 10
-                        done
-                        docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo 'API check failed'
-                        curl -s -f http://${PUBLIC_IP}/api/projects || echo 'External API check failed'
-                    '''
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..3}; do docker exec userstory-frontend curl -s -f http://backend:8080/api/projects && break; echo "API check retry $i failed"; sleep 10; done'
+                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo "API check failed"'
+                            curl -s -f http://${PUBLIC_IP}/api/projects || echo 'External API check failed'
+                        '''
+                    }
                 }
             }
         }
     }
     post {
         always {
-            sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
+            withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
+                sh '''
+                    ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logout ${DOCKER_REGISTRY}' || true
+                '''
+            }
         }
     }
 }
