@@ -34,12 +34,15 @@ pipeline {
         stage('Check Docker Host') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1"
-                    sh "docker -H ${DOCKER_HOST} network ls || exit 1"
+                    sh '''
+                        nc -zv 192.168.56.20 2375 || { echo "Cannot connect to Docker host"; exit 1; }
+                        docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1
+                        docker -H ${DOCKER_HOST} network ls || exit 1
+                    '''
                 }
             }
         }
-        stage('Create Docker Network') { // Новий етап
+        stage('Create Docker Network') {
             steps {
                 script {
                     sh '''
@@ -154,29 +157,10 @@ pipeline {
             steps {
                 script {
                     dir('frontend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
+                        sh "docker -H ${DOCKER_HOST} buildx build -t ${FRONTEND_IMAGE} . --push"
                     }
                     dir('backend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
-                    }
-                }
-            }
-        }
-        stage('Push Docker Images') {
-            steps {
-                script {
-                    withCredentials([
-                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
-                    ]) {
-                        sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=us-east-1
-                            aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
-                            docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}
-                            docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}
-                        '''
+                        sh "docker -H ${DOCKER_HOST} buildx build -t ${BACKEND_IMAGE} . --push"
                     }
                 }
             }
@@ -184,12 +168,16 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate"
-                    sh "sleep 300"
-                    sh "docker -H ${DOCKER_HOST} ps -a"
-                    sh "docker -H ${DOCKER_HOST} logs userstory-frontend"
-                    sh "docker -H ${DOCKER_HOST} logs userstory-backend"
+                    sh '''
+                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
+                        docker -H ${DOCKER_HOST} ps -q | xargs -r docker -H ${DOCKER_HOST} stop || true
+                        docker -H ${DOCKER_HOST} ps -a -q | xargs -r docker -H ${DOCKER_HOST} rm || true
+                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate
+                        sleep 300
+                        docker -H ${DOCKER_HOST} ps -a
+                        docker -H ${DOCKER_HOST} logs userstory-frontend
+                        docker -H ${DOCKER_HOST} logs userstory-backend
+                    '''
                 }
             }
         }
