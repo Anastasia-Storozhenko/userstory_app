@@ -1,74 +1,57 @@
 #!/bin/bash
-set -ex # -u означает завершать выполнение при обращении к неинициализированной переменной
+set -ex # -u means to terminate execution when accessing an uninitialized variable
 
-# 1. Базовый сетап: Установка Docker и AWS CLI
-echo "--- 1. Запуск установки Docker и AWS CLI v2 ---"
-yum update -y
+echo "--- 1. Basic Setup: Installing Docker, AWS CLI, and jq ---"
+yum update -y -q
 
-echo "--- Ожидание освобождения yum lock ---"
+echo "--- 2. Waiting for yum lock to be released ---"
 while sudo fuser /var/run/yum.pid >/dev/null 2>&1; do
-  echo "yum занят другим процессом, ждем 10 секунд..."
+  echo "Yum is busy with another process, wait 10 seconds..."
   sleep 10
 done
 
+yum install -y jq net-tools nmap-ncat awscli unzip
 amazon-linux-extras install docker -y
+
 systemctl enable docker
 systemctl start docker
 usermod -aG docker ec2-user
 
-yum install -y jq nmap-ncat
-
-# --- Проверка и установка AWS CLI v2 ---
-if ! /usr/local/bin/aws --version >/dev/null 2>&1; then
-  echo "Устанавливаем AWS CLI v2..."
-  yum remove -y awscli || true
-  curl --connect-timeout 10 --retry 5 --retry-delay 5 -o "awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-  unzip -q awscliv2.zip
-  ./aws/install
-  rm -rf awscliv2.zip aws
-else
-  echo "AWS CLI v2 уже установлена: $(/usr/local/bin/aws --version)"
-fi
-
 export PATH=$PATH:/usr/local/bin
 
-# 2. ECR Аутентификация
-echo "--- 2. ECR Аутентификация ---"
+echo "--- 3. ECR Authentication ---"
 AWS_REGION="${AWS_REGION}"
 ECR_FRONTEND_URL="${ECR_FRONTEND_URL}"
 BACKEND_PRIVATE_IP="${BACKEND_PRIVATE_IP}"
 
-echo "--- Проверка доступности ECR ---"
+echo "Checking ECR availability"
 until nc -zv 182000022338.dkr.ecr.us-east-1.amazonaws.com 443; do
-  echo "ECR ещё недоступен, пробуем снова через 10 секунд..."
+  echo "ECR is not yet available, try again in 10 seconds..."
   sleep 10
 done
-echo "ECR доступен."
+echo "ECR is available."
 
-# /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FRONTEND_URL
-# Попытка логина с ретраями (до 10 раз)
 MAX_RETRIES=10
 for i in $(seq 1 $MAX_RETRIES); do
-  /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FRONTEND_URL && break
-  echo "Попытка $i/$MAX_RETRIES не удалась, повтор через 10 секунд..."
+  aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_FRONTEND_URL && break
+  echo "Attempt $i/$MAX_RETRIES failed, retrying in 10 seconds..."
   sleep 10
 done
 
-echo "--- 3. Проверка доступности Backend ---"
+echo "--- 4. Backend availability check ---"
 while ! nc -z $BACKEND_PRIVATE_IP 8080; do
-  echo "Ожидание доступности Backend (${BACKEND_PRIVATE_IP}:8080)..."
+  echo "Waiting for Backend availability (${BACKEND_PRIVATE_IP}:8080)..."
   sleep 5
 done
-echo "Backend доступен."
+echo "Backend is available."
 
-echo "--- 4. Pull и запуск Frontend контейнера ---"
-# Добавляем цикл ожидания для ECR/интернета
+echo "--- 5. Pull and run Frontend container ---"
 until docker pull $ECR_FRONTEND_URL:latest; do
-  echo "Ожидание ECR/интернета для pull образа Frontend..."
+  echo "Waiting for ECR/Internet to pull Frontend image..."
   sleep 10
 done
 
-echo "--- 4.1. Добавление записи Backend в /etc/hosts ---"
+echo "--- 6. Adding a Backend entry to /etc/hosts ---"
 cat << 'EOF' > /tmp/nginx_frontend.template
 upstream backend_servers {
     server __BACKEND_IP__:8080;
@@ -98,15 +81,9 @@ server {
 }
 EOF
 
-# Подставляем IP
 sed "s|__BACKEND_IP__|${BACKEND_PRIVATE_IP}|g" /tmp/nginx_frontend.template > /tmp/nginx_frontend.conf
 
-# echo "--- 5. Запуск контейнера Frontend ---"
-# docker stop userstory_frontend || true
-# docker rm userstory_frontend || true
-
-# --- ЗАПУСК DOCKER С VOLUMES ---
-# Монтируем наш кастомный файл внутрь контейнера (перезаписывает стандартный файл default.conf)
+echo "--- 7. Run the Frontend container ---"
 docker run -d \
   --name userstory_frontend \
   --restart unless-stopped \
@@ -115,10 +92,9 @@ docker run -d \
   -e BACKEND_IP="$BACKEND_PRIVATE_IP" \
   $ECR_FRONTEND_URL:latest
 
+echo "Checking container startup..."
 sleep 10
-
 docker ps
-docker logs userstory_frontend --tail 20
-curl -I http://localhost/api/projects || true
+docker logs userstory_frontend --tail 20 || true
 
-echo "--- Frontend успешно запущен ---"
+echo "--- 8. Frontend installation script is complete ---"

@@ -14,10 +14,9 @@ data "aws_iam_policy_document" "assume_role_policy" {
 resource "aws_iam_role" "ec2_role" {
   name               = "${var.project_name}-ec2-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
-  # managed_policy_arns был удален отсюда, чтобы устранить предупреждение.
 }
 
-# --- 2.1. Attach AmazonSSMManagedInstanceCore Policy (New Recommended Syntax) ---
+# --- 2.1. Attach AmazonSSMManagedInstanceCore Policy ---
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -47,14 +46,6 @@ data "aws_iam_policy_document" "secrets_read_policy" {
   }
 }
 
-#data "aws_iam_policy_document" "secrets_read_policy" {
-#  statement {
-#    effect  = "Allow"
-#    actions = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-#    resources = [var.secret_arn] # Разрешаем только для нашего секрета!
-#  }
-#}
-
 # --- 4. IAM Policy ---
 resource "aws_iam_policy" "secrets_read_policy" {
   name        = "${var.project_name}-secrets-read-policy"
@@ -68,7 +59,7 @@ resource "aws_iam_role_policy_attachment" "secrets_read_attach" {
   policy_arn = aws_iam_policy.secrets_read_policy.arn
 }
 
-# --- 6. IAM Instance Profile (необходим для привязки роли к EC2) ---
+# --- 6. IAM Instance Profile (required to bind the role to EC2) ---
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-ec2-profile"
   role = aws_iam_role.ec2_role.name
@@ -84,7 +75,7 @@ data "aws_iam_policy_document" "ecr_read_policy" {
       "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage"
     ]
-    # GetAuthorizationToken требует Resource = "*"
+
     resources = ["*"] 
   }
 }

@@ -24,11 +24,11 @@ output "vpc_endpoint_sg_id" {
 }
 
 output "database_security_group_id" {
-  description = "The ID of the Security Group attached to the Database instance/RDS."
+  description = "The ID of the Security Group attached to the Database instance/RDS"
   value       = aws_security_group.database.id 
 }
 
 output "bastion_lb_security_group_id" {
-  description = "The ID of the Security Group attached to the Bastion/LB instance."
+  description = "The ID of the Security Group attached to the Bastion/LB instance"
   value       = aws_security_group.bastion_lb.id
 }

@@ -1,10 +1,6 @@
-#######################################
-# Network ACL для VPC
-#######################################
-
+# Network ACL for VPC
 resource "aws_network_acl" "main" {
-  vpc_id = var.vpc_id
-
+  vpc_id     = var.vpc_id
   subnet_ids = var.subnet_ids
 
   tags = {
@@ -12,11 +8,7 @@ resource "aws_network_acl" "main" {
   }
 }
 
-#######################################
-# Inbound rules
-#######################################
-
-# Разрешаем внутренний трафик внутри VPC
+# Inbound rule: Allow internal traffic within a VPC
 resource "aws_network_acl_rule" "allow_internal_inbound" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 100
@@ -26,7 +18,7 @@ resource "aws_network_acl_rule" "allow_internal_inbound" {
   cidr_block     = var.vpc_cidr
 }
 
-# Разрешаем всё остальное (например, доступ из интернета)
+# Inbound rule: Allow everything else (exmpl, access from the Internet)
 resource "aws_network_acl_rule" "allow_all_inbound" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 200
@@ -36,11 +28,7 @@ resource "aws_network_acl_rule" "allow_all_inbound" {
   cidr_block     = "0.0.0.0/0"
 }
 
-#######################################
-# Outbound rules
-#######################################
-
-# Разрешаем внутренний трафик
+# Outbound rule: Allow internal traffic
 resource "aws_network_acl_rule" "allow_internal_outbound" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 100
@@ -50,7 +38,7 @@ resource "aws_network_acl_rule" "allow_internal_outbound" {
   cidr_block     = var.vpc_cidr
 }
 
-# Разрешаем выход в интернет
+# Outbound rule: Allow Internet access
 resource "aws_network_acl_rule" "allow_all_outbound" {
   network_acl_id = aws_network_acl.main.id
   rule_number    = 200
