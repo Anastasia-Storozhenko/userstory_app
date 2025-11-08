@@ -142,12 +142,12 @@ pipeline {
                 dir('frontend') {
                     sh '''
                         npm install @babel/plugin-transform-private-methods@latest \
-                                @babel/plugin-transform-class-properties@latest \
-                                @babel/plugin-transform-numeric-separator@latest \
-                                @babel/plugin-transform-nullish-coalescing-operator@latest \
-                                @babel/plugin-transform-optional-chaining@latest \
-                                @jridgewell/sourcemap-codec@latest \
-                                @rollup/plugin-terser@latest
+                                   @babel/plugin-transform-class-properties@latest \
+                                   @babel/plugin-transform-numeric-separator@latest \
+                                   @babel/plugin-transform-nullish-coalescing-operator@latest \
+                                   @babel/plugin-transform-optional-chaining@latest \
+                                   @jridgewell/sourcemap-codec@latest \
+                                   @rollup/plugin-terser@latest
                         npm audit fix || true
                         npm install
                         CI=false npm run build
@@ -189,10 +189,14 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
-                        docker -H ${DOCKER_HOST} ps -q | xargs -r docker -H ${DOCKER_HOST} stop || true
-                        docker -H ${DOCKER_HOST} ps -a -q | xargs -r docker -H ${DOCKER_HOST} rm || true
-                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate
+                        for i in {1..3}; do
+                            docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
+                            docker -H ${DOCKER_HOST} ps -q | xargs -r docker -H ${DOCKER_HOST} stop || true
+                            docker -H ${DOCKER_HOST} ps -a -q | xargs -r docker -H ${DOCKER_HOST} rm || true
+                            docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate && break
+                            echo "Retry $i failed, waiting before next attempt..."
+                            sleep 10
+                        done
                         sleep 60
                         docker -H ${DOCKER_HOST} ps -a
                         docker -H ${DOCKER_HOST} logs userstory-frontend

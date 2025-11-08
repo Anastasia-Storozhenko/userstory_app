@@ -9,7 +9,7 @@ services:
       - app-network
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started # Змінено з service_healthy на service_started
     environment:
       - REACT_APP_API_URL=http://backend:8080/api
     deploy:
@@ -17,10 +17,11 @@ services:
         condition: on-failure
         max_attempts: 3
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 15s
   backend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
     container_name: userstory-backend
