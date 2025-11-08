@@ -140,8 +140,18 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
-                    sh 'npm install'
-                    sh 'CI=false npm run build'
+                    sh '''
+                        npm install @babel/plugin-transform-private-methods@latest \
+                                   @babel/plugin-transform-class-properties@latest \
+                                   @babel/plugin-transform-numeric-separator@latest \
+                                   @babel/plugin-transform-nullish-coalescing-operator@latest \
+                                   @babel/plugin-transform-optional-chaining@latest \
+                                   @jridgewell/sourcemap-codec@latest \
+                                   @rollup/plugin-terser@latest
+                        npm audit fix
+                        npm install
+                        CI=false npm run build
+                    '''
                 }
             }
         }
@@ -183,10 +193,11 @@ pipeline {
                         docker -H ${DOCKER_HOST} ps -q | xargs -r docker -H ${DOCKER_HOST} stop || true
                         docker -H ${DOCKER_HOST} ps -a -q | xargs -r docker -H ${DOCKER_HOST} rm || true
                         docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate
-                        sleep 300
+                        sleep 60
                         docker -H ${DOCKER_HOST} ps -a
                         docker -H ${DOCKER_HOST} logs userstory-frontend
                         docker -H ${DOCKER_HOST} logs userstory-backend
+                        docker -H ${DOCKER_HOST} exec userstory-backend nc -zv 10.0.2.195 3306 || echo 'Database connection failed'
                     '''
                 }
             }

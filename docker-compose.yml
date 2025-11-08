@@ -8,7 +8,8 @@ services:
     networks:
       - app-network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - REACT_APP_API_URL=http://backend:8080/api
     deploy:
@@ -32,15 +33,19 @@ services:
       - SPRING_DATASOURCE_USERNAME=userstory_admin
       - SPRING_DATASOURCE_PASSWORD=devuser
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=60000
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MariaDBDialect
     deploy:
       restart_policy:
         condition: on-failure
         max_attempts: 3
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/projects"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
 networks:
   app-network:
     driver: bridge
