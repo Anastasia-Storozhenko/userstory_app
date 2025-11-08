@@ -1,7 +1,7 @@
 FROM node:20.11.0 AS build
 WORKDIR /app
 COPY package*.json ./
-ENV REACT_APP_BACKEND_URL=/api
+
 RUN npm install
 COPY . .
 RUN npm run build
