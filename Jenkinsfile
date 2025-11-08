@@ -175,11 +175,27 @@ pipeline {
                             export AWS_DEFAULT_REGION=us-east-1
                             aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
                             cd frontend
-                            docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} .
-                            docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}
+                            for i in {1..3}; do
+                                docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} . && break
+                                echo "Frontend build retry $i failed, waiting before next attempt..."
+                                sleep 10
+                            done
+                            for i in {1..3}; do
+                                docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE} && break
+                                echo "Frontend push retry $i failed, waiting before next attempt..."
+                                sleep 10
+                            done
                             cd ../backend
-                            docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} .
-                            docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}
+                            for i in {1..3}; do
+                                docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} . && break
+                                echo "Backend build retry $i failed, waiting before next attempt..."
+                                sleep 10
+                            done
+                            for i in {1..3}; do
+                                docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE} && break
+                                echo "Backend push retry $i failed, waiting before next attempt..."
+                                sleep 10
+                            done
                         '''
                     }
                 }
@@ -197,11 +213,17 @@ pipeline {
                             echo "Retry $i failed, waiting before next attempt..."
                             sleep 10
                         done
-                        sleep 60
+                        sleep 120
                         docker -H ${DOCKER_HOST} ps -a
                         docker -H ${DOCKER_HOST} logs userstory-frontend
                         docker -H ${DOCKER_HOST} logs userstory-backend
+                        for i in {1..5}; do
+                            docker -H ${DOCKER_HOST} exec userstory-backend nc -zv 10.0.2.195 3306 && break
+                            echo "Database connection retry $i failed, waiting before next attempt..."
+                            sleep 15
+                        done
                         docker -H ${DOCKER_HOST} exec userstory-backend nc -zv 10.0.2.195 3306 || echo 'Database connection failed'
+                        docker -H ${DOCKER_HOST} exec userstory-backend curl -f http://localhost:8080/actuator/health || echo 'Backend health check failed'
                     '''
                 }
             }
@@ -210,6 +232,11 @@ pipeline {
             steps {
                 script {
                     sh '''
+                        for i in {1..3}; do
+                            docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects && break
+                            echo "API check retry $i failed, waiting before next attempt..."
+                            sleep 10
+                        done
                         docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo 'API check failed'
                     '''
                 }

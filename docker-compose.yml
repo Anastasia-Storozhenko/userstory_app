@@ -9,13 +9,13 @@ services:
       - app-network
     depends_on:
       backend:
-        condition: service_started # Змінено з service_healthy на service_started
+        condition: service_started
     environment:
       - REACT_APP_API_URL=http://backend:8080/api
     deploy:
       restart_policy:
         condition: on-failure
-        max_attempts: 3
+        max_attempts: 5
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
       interval: 30s
@@ -35,18 +35,21 @@ services:
       - SPRING_DATASOURCE_PASSWORD=devuser
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=60000
-      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
       - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MariaDBDialect
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TEST_QUERY=SELECT 1
+      - SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2
+      - SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT=300000
     deploy:
       restart_policy:
         condition: on-failure
-        max_attempts: 3
+        max_attempts: 5
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 120s
 networks:
   app-network:
     driver: bridge
