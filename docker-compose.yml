@@ -29,8 +29,11 @@ services:
       - "8080:8080"
     networks:
       - app-network
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://10.0.2.195:3306/userstory
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://db:3306/userstory?createDatabaseIfNotExist=true
       - SPRING_DATASOURCE_USERNAME=userstory_admin
       - SPRING_DATASOURCE_PASSWORD=devuser
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
@@ -50,6 +53,26 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+  db:
+    image: mariadb:10.6
+    container_name: userstory-db
+    networks:
+      - app-network
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=userstory
+      - MYSQL_USER=userstory_admin
+      - MYSQL_PASSWORD=devuser
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "userstory_admin", "-pdevuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 networks:
   app-network:
     driver: bridge
+volumes:
+  db-data:

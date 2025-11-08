@@ -8,7 +8,7 @@ pipeline {
     }
     environment {
         DB_USER = credentials('db-credentials')
-        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.195:3306/userstory'
+        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://db:3306/userstory?createDatabaseIfNotExist=true'
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
@@ -131,7 +131,6 @@ pipeline {
                         export AWS_DEFAULT_REGION=us-east-1
                         aws ec2 describe-vpcs --filters "Name=tag:Name,Values=userstory-vpc" || echo "VPC not found"
                         aws ec2 describe-instances --filters "Name=tag:Name,Values=userstory-frontend" || echo "EC2 not found"
-                        aws ec2 describe-instances --filters "Name=tag:Name,Values=userstory-database" || echo "Database EC2 not found"
                         aws ecr describe-repositories --repository-names userstory-frontend || echo "ECR not found"
                     '''
                 }
@@ -217,12 +216,13 @@ pipeline {
                         docker -H ${DOCKER_HOST} ps -a
                         docker -H ${DOCKER_HOST} logs userstory-frontend
                         docker -H ${DOCKER_HOST} logs userstory-backend
+                        docker -H ${DOCKER_HOST} logs userstory-db
                         for i in {1..5}; do
-                            docker -H ${DOCKER_HOST} exec userstory-backend nc -zv 10.0.2.195 3306 && break
+                            docker -H ${DOCKER_HOST} exec userstory-backend nc -zv db 3306 && break
                             echo "Database connection retry $i failed, waiting before next attempt..."
                             sleep 15
                         done
-                        docker -H ${DOCKER_HOST} exec userstory-backend nc -zv 10.0.2.195 3306 || echo 'Database connection failed'
+                        docker -H ${DOCKER_HOST} exec userstory-backend nc -zv db 3306 || echo 'Database connection failed'
                         docker -H ${DOCKER_HOST} exec userstory-backend curl -f http://localhost:8080/actuator/health || echo 'Backend health check failed'
                     '''
                 }
