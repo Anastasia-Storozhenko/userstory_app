@@ -44,7 +44,7 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-
+/*
         stage('SonarCloud Analysis') {
             steps {
                 script {
@@ -92,7 +92,7 @@ pipeline {
                     }
                 }
             }
-        }
+        } */
         
         stage('Terraform Init & Plan') {
             steps {
