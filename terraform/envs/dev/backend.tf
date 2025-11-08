@@ -8,10 +8,11 @@ terraform {
 
   backend "s3" {
     bucket         = "userstory-terraform-state"
-    key            = "dev/infrastructure.tfstate" # Important: the path is tied to the environment!
+    key            = "dev/infrastructure.tfstate" # Важно: путь привязан к окружению!
     region         = "us-east-1"
     dynamodb_table = "userstory-terraform-locks"
-    encrypt        = true
+    # use_lockfile   = true
+    encrypt = true
   }
 }
 

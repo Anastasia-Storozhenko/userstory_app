@@ -1,4 +1,4 @@
 output "network_acl_id" {
-  description = "ID of the created NACL"
+  description = "ID созданного NACL"
   value       = aws_network_acl.main.id
 }

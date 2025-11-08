@@ -33,7 +33,7 @@ variable "instance_profile_name" {
   type        = string
 }
 
-# --- Variables for user_data (containers) ---
+# --- Переменные для user_data (для контейнеров) ---
 variable "aws_region" {
   description = "The AWS region."
   type        = string

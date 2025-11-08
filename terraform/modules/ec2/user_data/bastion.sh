@@ -1,23 +1,28 @@
 #!/bin/bash
-set -ex # -u means to terminate execution when accessing an uninitialized variable
+set -ex # -u означает завершать выполнение при обращении к неинициализированной переменной
 
-FRONTEND_IP="${FRONTEND_IP}" # FRONTEND_IP will be automatically available in the template
-BACKEND_IP="${BACKEND_IP}"   # Defining a variable passed through Terraform
-echo "--- frontend=${FRONTEND_IP}, backend=${BACKEND_IP} ---"
+# Определение переменной, переданной через Terraform
+# FRONTEND_IP будет автоматически доступен в шаблоне
+FRONTEND_IP="${FRONTEND_IP}"
+BACKEND_IP="${BACKEND_IP}"
 
-echo "--- 1. Installing Nginx. Using yum for Amazon Linux 2 ---"
-yum update -y -q
-amazon-linux-extras install nginx1 -y
+# 1. Установка Nginx (ИСПРАВЛЕНО: Используем yum для Amazon Linux 2)
+echo "Установка Nginx..."
+yum update -y
+amazon-linux-extras install nginx1 -y # Устанавливаем Nginx из Amazon Extras
 systemctl enable nginx
 systemctl start nginx
 
-echo "--- 2. Configuring Nginx to listen on port 80 and proxy to the Frontend ---"
-# NOTE: For Amazon Linux 2, Nginx uses the /etc/nginx/nginx.conf directory
-# Create a new configuration file for Nginx that will act as a Reverse Proxy
+# 2. Создание файла конфигурации Reverse Proxy
+# Настраиваем Nginx на прослушивание порта 80 и проксирование на Frontend
+echo "Настройка Nginx как Reverse Proxy..."
+# NOTE: Для Amazon Linux 2 Nginx использует каталог /etc/nginx/nginx.conf
+# Создадим новый файл конфигурации для Nginx, который будет работать как Reverse Proxy.
 mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak || true
 mkdir -p /etc/nginx/conf.d
 
-echo "--- 3. Clearing the built-in server{} from the main nginx.conf ---"
+#  4. Чистим основной nginx.conf от встроенного server{}...
+echo "Чистим основной nginx.conf от встроенного server{}..."
 
 cat <<'NGINX' > /etc/nginx/nginx.conf
 user nginx;
@@ -47,83 +52,67 @@ http {
 }
 NGINX
 
-echo "--- 4. Configuring reverse-proxy.conf ---"
-cat <<'EOF' > /etc/nginx/conf.d/reverse-proxy.conf
+cat <<EOF > /etc/nginx/conf.d/reverse-proxy.conf
 # --- Upstream blocks ---
 upstream frontend_app { server ${FRONTEND_IP}:80; }
-upstream backend_app  { server ${BACKEND_IP}:8080; }
 
 server {
     listen 80 default_server;
     server_name _;
 
-    # --- 1. Static assets (React build) ---
-    location /static/ {
-        proxy_pass http://frontend_app/static/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # --- 2. API-requests to backend ---
-    location /api/ {
-        proxy_pass http://backend_app/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 10s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # --- 3. Alternative - if the frontend uses /projects ---
-    location /projects/ {
-        proxy_pass http://backend_app/projects/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 10s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # --- 4. Home page and frontend static files ---
+    # *** KEY POINT: Proxy traffic to the private IP of the Frontend instance ***
+    # --- React SPA ---
     location / {
         proxy_pass http://frontend_app;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # Обязательно, иначе React будет возвращать index.html на все запросы
         proxy_intercept_errors off;
-        try_files $uri $uri/ /index.html;
+
+        # ключ: если фронтенд SPA (React/Angular/Vue)
+        try_files \$uri \$uri/ /index.html;
     }
 
-    # --- 5. Health check ---
+    # --- Static React files ---
+    location /static/ {
+        proxy_pass http://frontend_app/static/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # --- Health check endpoint ---
     location /health {
         access_log off;
         return 200 'OK';
         add_header Content-Type text/plain;
     }
-
-    error_page 500 502 503 504 /50x.html;
-    location = /50x.html {
-        root /usr/share/nginx/html;
-    }
 }
 EOF
 
-echo " --- 5. Check and restart Nginx ---"
-sudo nginx -t || (echo "Nginx config failed"; exit 1)
+# 4. Проверка, включение и запуск Nginx
+echo "Проверка и запуск Nginx..."
+# Убедимся, что Nginx запускается при старте
+# sudo systemctl enable nginx 
+# Проверяем конфигурацию
+sudo nginx -t
+# Запускаем Nginx
 sudo systemctl restart nginx
 
-echo " --- 6. Bastion installation script is complete ---"
+# 4. Проверка работы Reverse Proxy
+#echo "Проверка Nginx: netstat -tuln | grep 80"
+#sudo netstat -tuln | grep 80
+
+echo "--- Reverse Proxy настроен: frontend=${FRONTEND_IP}, backend=${BACKEND_IP} ---"

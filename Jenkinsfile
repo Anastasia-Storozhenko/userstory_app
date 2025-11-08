@@ -45,8 +45,6 @@ pipeline {
             }
         }
 
-       
-
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
@@ -201,7 +199,7 @@ pipeline {
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
-                            echo "Push process completed"
+                            echo "🎉 Push process completed"
                         '''
                     }
                 }
