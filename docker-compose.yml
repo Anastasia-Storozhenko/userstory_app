@@ -2,42 +2,79 @@ version: '3.8'
 services:
   frontend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
+    container_name: userstory-frontend
     ports:
-      - "80:80"  # Публічний доступ до фронтенду
+      - "80:80"
     networks:
       - app-network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      - REACT_APP_API_URL=http://backend:8080/api  # Внутрішня URL для API
-
+      - REACT_APP_API_URL=http://ec2-98-92-121-235.compute-1.amazonaws.com:8080/api
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
   backend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
+    container_name: userstory-backend
     ports:
-      - "8080:8080"  # Публічний доступ до бекенду
+      - "8080:8080"
     networks:
       - app-network
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://10.0.2.195:3306/userstory  # IP бази
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://db:3306/userstory?createDatabaseIfNotExist=true
       - SPRING_DATASOURCE_USERNAME=userstory_admin
       - SPRING_DATASOURCE_PASSWORD=devuser
-    depends_on:
-      - db  # Для порядку, хоча база зовнішня
-
-  # База даних — зовнішній сервіс, не контейнер
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=60000
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MariaDBDialect
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TEST_QUERY=SELECT 1
+      - SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2
+      - SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT=300000
+      - SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT=0
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
   db:
-    image: mariadb:10.11  # Лише для локального тестування, закоментуй на продакшені
-    environment:
-      - MYSQL_ROOT_PASSWORD=devuser
-      - MYSQL_DATABASE=userstory
-      - MYSQL_USER=userstory_admin
-      - MYSQL_PASSWORD=devuser
-    ports:
-      - "3306:3306"  # Для локального тестування
+    image: mariadb:10.6
+    container_name: userstory-db
     networks:
       - app-network
-    # Закоментуй або видали на продакшені, бо база на EC2
-
+    environment:
+      - MARIADB_ROOT_PASSWORD=rootpass
+      - MARIADB_DATABASE=userstory
+      - MARIADB_USER=userstory_admin
+      - MARIADB_PASSWORD=devuser
+      - MARIADB_ROOT_HOST=%
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 networks:
   app-network:
-    external: true  # Створена Terraform
+    driver: bridge
+volumes:
+  db-data:
