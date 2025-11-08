@@ -37,7 +37,7 @@ pipeline {
                     sh '''
                         nc -zv 192.168.56.20 2375 || { echo "Cannot connect to Docker host"; exit 1; }
                         docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1
-                        docker -H ${DOCKER_HOST} network ls || exit 1
+                        docker -H ${DOCKER_HOST} buildx version || { echo "Buildx not installed"; exit 1; }
                     '''
                 }
             }
@@ -153,14 +153,23 @@ pipeline {
                 }
             }
         }
-        stage('Build Docker Images') {
+        stage('Build and Push Docker Images') {
             steps {
                 script {
-                    dir('frontend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
-                    }
-                    dir('backend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
+                            aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                            cd frontend
+                            docker -H ${DOCKER_HOST} buildx build --tag ${FRONTEND_IMAGE} . --push
+                            cd ../backend
+                            docker -H ${DOCKER_HOST} buildx build --tag ${BACKEND_IMAGE} . --push
+                        '''
                     }
                 }
             }
@@ -184,7 +193,9 @@ pipeline {
         stage('Test Application') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo 'API check failed'"
+                    sh '''
+                        docker -H ${DOCKER_HOST} exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo 'API check failed'
+                    '''
                 }
             }
         }
