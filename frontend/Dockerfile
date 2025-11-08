@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-ENV REACT_APP_BACKEND_URL=http://192.168.56.20:80/api
+ENV REACT_APP_BACKEND_URL=/api
 RUN npm run build
 
 FROM nginx:1.29.2
