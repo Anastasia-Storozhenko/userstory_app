@@ -3,41 +3,39 @@ services:
   frontend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest
     ports:
-      - "80:80"  # Публічний доступ до фронтенду
+      - "80:80"
     networks:
       - app-network
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=http://backend:8080/api  # Внутрішня URL для API
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
 
   backend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
     ports:
-      - "8080:8080"  # Публічний доступ до бекенду
+      - "8080:8080"
     networks:
       - app-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mariadb://10.0.2.195:3306/userstory  # IP бази
-      - SPRING_DATASOURCE_USERNAME=userstory_admin
-      - SPRING_DATASOURCE_PASSWORD=devuser
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
     depends_on:
-      - db  # Для порядку, хоча база зовнішня
+      - db
 
-  # База даних — зовнішній сервіс, не контейнер
   db:
-    image: mariadb:10.11  # Лише для локального тестування, закоментуй на продакшені
+    image: mariadb:10.11
     environment:
-      - MYSQL_ROOT_PASSWORD=devuser
-      - MYSQL_DATABASE=userstory
-      - MYSQL_USER=userstory_admin
-      - MYSQL_PASSWORD=devuser
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     ports:
-      - "3306:3306"  # Для локального тестування
+      - "3306:3306"
     networks:
       - app-network
-    # Закоментуй або видали на продакшені, бо база на EC2
 
 networks:
   app-network:
-    external: true  # Створена Terraform
+    external: true
