@@ -39,6 +39,16 @@ pipeline {
                 }
             }
         }
+        stage('Create Docker Network') { // Новий етап
+            steps {
+                script {
+                    sh '''
+                        docker -H ${DOCKER_HOST} network inspect app-network || \
+                        docker -H ${DOCKER_HOST} network create app-network
+                    '''
+                }
+            }
+        }
         stage('Checkout') {
             steps {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
@@ -176,7 +186,7 @@ pipeline {
                 script {
                     sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
                     sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate"
-                    sh "sleep 300" // Збільшено час очікування
+                    sh "sleep 300"
                     sh "docker -H ${DOCKER_HOST} ps -a"
                     sh "docker -H ${DOCKER_HOST} logs userstory-frontend"
                     sh "docker -H ${DOCKER_HOST} logs userstory-backend"
