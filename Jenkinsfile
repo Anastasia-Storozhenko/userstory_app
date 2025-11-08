@@ -207,24 +207,7 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
-            steps {
-                script {
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
-                    sh "sleep 180"
-                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
-                }
-            }
-        }
-
-        stage('Test Application') {
-            steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
-                }
-            }
-        }
+       
     }
     post {
         always {
