@@ -9,7 +9,7 @@ services:
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - REACT_APP_API_URL=http://ec2-3-231-93-40.compute-1.amazonaws.com:80/api
 
   backend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
@@ -18,7 +18,7 @@ services:
     networks:
       - app-network
     environment:
-      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://db:3306/userstory
       - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
     depends_on:
@@ -38,4 +38,4 @@ services:
 
 networks:
   app-network:
-    external: true
+    driver: bridge
