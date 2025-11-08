@@ -157,10 +157,10 @@ pipeline {
             steps {
                 script {
                     dir('frontend') {
-                        sh "docker -H ${DOCKER_HOST} buildx build -t ${FRONTEND_IMAGE} . --push"
+                        sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
                     }
                     dir('backend') {
-                        sh "docker -H ${DOCKER_HOST} buildx build -t ${BACKEND_IMAGE} . --push"
+                        sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
                     }
                 }
             }
