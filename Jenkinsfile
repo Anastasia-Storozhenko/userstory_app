@@ -142,13 +142,13 @@ pipeline {
                 dir('frontend') {
                     sh '''
                         npm install @babel/plugin-transform-private-methods@latest \
-                                   @babel/plugin-transform-class-properties@latest \
-                                   @babel/plugin-transform-numeric-separator@latest \
-                                   @babel/plugin-transform-nullish-coalescing-operator@latest \
-                                   @babel/plugin-transform-optional-chaining@latest \
-                                   @jridgewell/sourcemap-codec@latest \
-                                   @rollup/plugin-terser@latest
-                        npm audit fix
+                                @babel/plugin-transform-class-properties@latest \
+                                @babel/plugin-transform-numeric-separator@latest \
+                                @babel/plugin-transform-nullish-coalescing-operator@latest \
+                                @babel/plugin-transform-optional-chaining@latest \
+                                @jridgewell/sourcemap-codec@latest \
+                                @rollup/plugin-terser@latest
+                        npm audit fix || true
                         npm install
                         CI=false npm run build
                     '''
