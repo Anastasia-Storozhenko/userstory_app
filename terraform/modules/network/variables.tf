@@ -1,20 +1,20 @@
 variable "vpc_id" {
-  description = "ID VPC, к которой привязывается ACL"
+  description = "ID of the VPC to which the ACL is attached"
   type        = string
 }
 
 variable "subnet_ids" {
-  description = "Список subnet IDs для привязки NACL"
+  description = "List of subnet IDs for NACL binding"
   type        = list(string)
 }
 
 variable "vpc_cidr" {
-  description = "CIDR блок VPC"
+  description = "CIDR block VPC"
   type        = string
   default     = "10.0.0.0/16"
 }
 
 variable "project_name" {
-  description = "Имя проекта для тегов"
+  description = "Project name for tags"
   type        = string
 }

@@ -1,4 +1,4 @@
-# Глобальные переменные окружения
+# Global environment variables
 variable "env_name" {
   type    = string
   default = "dev"
@@ -9,12 +9,11 @@ variable "project_prefix" {
   default = "userstory"
 }
 
-# Переменные для доступа
+# Variables to access
 variable "my_ip_for_ssh" {
   description = "Your workstation IP CIDR for SSH access (e.g., 188.163.83.183/32)"
   type        = string
-  # default     = "188.163.82.1/32" # Мой IP адресс
-  default = "0.0.0.0/0" # Мой IP адресс
+  default     = "0.0.0.0/0" # My IP address or the entire Internet
 }
 
 variable "vpc_cidr" {
@@ -39,8 +38,3 @@ variable "db_port" {
   type        = number
   default     = 3306
 }
-
-#variable "database_image_uri" {
-#  description = "Full URI of the database Docker image in ECR"
-#  type        = string
-#}
