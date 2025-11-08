@@ -37,7 +37,6 @@ pipeline {
                     sh '''
                         nc -zv 192.168.56.20 2375 || { echo "Cannot connect to Docker host"; exit 1; }
                         docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1
-                        docker -H ${DOCKER_HOST} buildx version || { echo "Buildx not installed"; exit 1; }
                     '''
                 }
             }
@@ -166,9 +165,11 @@ pipeline {
                             export AWS_DEFAULT_REGION=us-east-1
                             aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
                             cd frontend
-                            docker -H ${DOCKER_HOST} buildx build --tag ${FRONTEND_IMAGE} . --push
+                            docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} .
+                            docker -H ${DOCKER_HOST} push ${FRONTEND_IMAGE}
                             cd ../backend
-                            docker -H ${DOCKER_HOST} buildx build --tag ${BACKEND_IMAGE} . --push
+                            docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} .
+                            docker -H ${DOCKER_HOST} push ${BACKEND_IMAGE}
                         '''
                     }
                 }
