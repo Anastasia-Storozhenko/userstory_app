@@ -204,8 +204,12 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
-                    sh 'npm install'
-                    sh 'CI=false npm run build'
+                    sh '''
+                        rm -rf node_modules package-lock.json
+                        npm cache clean --force
+                        npm install --verbose
+                        CI=false npm run build
+                    '''
                 }
             }
         }
