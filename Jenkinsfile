@@ -44,55 +44,6 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-/*
-        stage('SonarCloud Analysis') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                            
-                            if [ ! -d "frontend/node_modules" ]; then
-                                cd frontend && npm ci
-                            else
-                                echo "Using cached node_modules"
-                            fi
-
-                            
-                            export SONAR_USER_HOME=/var/lib/jenkins/.sonar
-                            mkdir -p $SONAR_USER_HOME/cache
-
-                            
-                            cd backend
-                            mvn verify sonar:sonar \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} || true
-
-                            
-                            cd ../frontend
-                            export NODE_OPTIONS="--max_old_space_size=2048"
-                            CI=false npm run build
-
-                            npm install --save-dev sonar-scanner
-
-                            npx sonar-scanner \
-                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                -Dsonar.organization=anastasia-storozhenko \
-                                -Dsonar.host.url=https://sonarcloud.io \
-                                -Dsonar.token=${SONAR_TOKEN} \
-                                -Dsonar.sources=src \
-                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
-                                -Dsonar.sourceEncoding=UTF-8 \
-                                -Dsonar.ws.timeout=300 \
-                                -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                -X || echo "Frontend Sonar failed" || true
-                        '''
-                    }
-                }
-            }
-        } */
         
         stage('Terraform Init & Plan') {
             steps {
