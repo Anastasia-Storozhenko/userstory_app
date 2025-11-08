@@ -19,7 +19,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
   backend:
     image: 182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest
     ports:
@@ -40,7 +39,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
 networks:
   app-network:
-    external: true
+    driver: bridge
