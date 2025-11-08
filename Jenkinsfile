@@ -8,13 +8,13 @@ pipeline {
     }
     environment {
         DB_USER = credentials('db-credentials')
-        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.195:3306/userstory'  
+        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.105:3306/userstory'  // Замініть на private IP
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
-        DOCKER_HOST = 'tcp://192.168.56.20:2375'
+        DOCKER_HOST = 'tcp://3.231.93.40:2376'  // Змінено на EC2
         COMPOSE_HTTP_TIMEOUT = '120'
 
         SONAR_TOKEN = credentials('sonarcloud-token')
@@ -81,13 +81,11 @@ pipeline {
                             export AWS_DEFAULT_REGION=us-east-1
                             
                             terraform init
-                            # Check if key resources exist in AWS
                             echo "=== Checking real AWS resources before cleaning state ==="
                             VPC_EXISTS=$(aws ec2 describe-vpcs --filters "Name=vpc-id,Values=vpc-0345483fc5285dae2" --query 'Vpcs | length(@)' || echo 0)
                             FRONTEND_EXISTS=$(aws ec2 describe-instances --filters "Name=instance-id,Values=i-04fbb5a25cbee00d2" --query 'Reservations | length(@)' || echo 0)
                             echo "VPC exists: $VPC_EXISTS, Frontend EC2 exists: $FRONTEND_EXISTS"
                             
-                            # Run plan and capture exit code
                             terraform plan -detailed-exitcode -var="project_prefix=${TF_VAR_project_prefix}" -var="env_name=${TF_VAR_env_name}" > plan_output.txt 2>&1
                             PLAN_EXIT_CODE=$?
                             echo "Terraform plan exit code: $PLAN_EXIT_CODE"
@@ -281,10 +279,16 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
-                    sh "sleep 180"
-                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
+                        aws ecr get-login-password --region us-east-1 | docker -H ${DOCKER_HOST} login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
+                        docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate
+                        sleep 180
+                        docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'
+                    '''
                 }
             }
         }
@@ -292,7 +296,9 @@ pipeline {
         stage('Test Application') {
             steps {
                 script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
+                    sh '''
+                        docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://ec2-3-231-93-40.compute-1.amazonaws.com:80/api/projects || echo 'API check failed'
+                    '''
                 }
             }
         }
