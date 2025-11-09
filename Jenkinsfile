@@ -208,21 +208,57 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        
+        stage('Checkout Docker Repo for Deploy') {
             steps {
-                script {
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
-                    sh "sleep 180"
-                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
+                dir('docker-deploy-files') {
+                    git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory-app-docker.git'
+                    sh 'ls -la'  
                 }
             }
         }
-
+        
+        stage('Deploy') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    script {
+                        
+                        dir('docker-deploy-files') {
+                            sh '''
+                                echo "=== DEPLOY USING DOCKER-COMPOSE FROM SEPARATE REPO ==="
+                                
+                                # Переконуємося, що docker-compose.yml існує
+                                ls -la docker-compose.yml || echo "docker-compose.yml not found in repo"
+                                
+                                # Виконуємо docker-compose через DOCKER_HOST
+                                export DOCKER_CLIENT_TIMEOUT=300
+                                export COMPOSE_HTTP_TIMEOUT=300
+                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
+                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d
+                                
+                                # Перевіряємо статус контейнерів
+                                docker -H ${DOCKER_HOST} ps -a
+                                sleep 10  
+                                echo "Deploy completed successfully"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        
         stage('Test Application') {
             steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
+                timeout(time: 2, unit: 'MINUTES') {
+                    script {
+                        sh '''
+                            echo "=== TESTING APPLICATION ==="
+                            # Тест API через DOCKER_HOST
+                            docker -H ${DOCKER_HOST} exec frontend-web curl -s http://localhost:8081/api/projects || echo "API check failed (backend on port 8081)"
+                            # Альтернатива: тест з хоста
+                            curl -s http://192.168.56.20:8080 || echo "Frontend check failed"
+                        '''
+                    }
                 }
             }
         }
@@ -230,6 +266,8 @@ pipeline {
     post {
         always {
             sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
+            // Очищення тимчасової папки з Docker-репозиторієм
+            sh "rm -rf docker-deploy-files || true"
         }
     }
 }
