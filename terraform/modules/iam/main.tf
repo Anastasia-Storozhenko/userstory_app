@@ -44,6 +44,16 @@ data "aws_iam_policy_document" "secrets_read_policy" {
     ]
     resources = ["*"]
   }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue"
+    ]
+    resources = [
+      "arn:aws:secretsmanager:us-east-1:182000022338:secret:userstory-datadog-secret*"
+    ]
+  }
 }
 
 # --- 4. IAM Policy ---

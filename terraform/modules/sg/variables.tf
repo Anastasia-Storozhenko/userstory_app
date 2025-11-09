@@ -24,3 +24,8 @@ variable "vpc_cidr" {
   description = "The CIDR block of the main VPC (e.g., 10.0.0.0/16)"
   type        = string
 }
+
+variable "project_name" {
+  description = "Base project name prefix (e.g. userstory)"
+  type        = string
+}

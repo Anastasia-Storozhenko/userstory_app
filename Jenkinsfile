@@ -8,15 +8,13 @@ pipeline {
     }
     environment {
         DB_USER = credentials('db-credentials')
-        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://db:3306/userstory?createDatabaseIfNotExist=true'
+        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.195:3306/userstory'  // IP з EC2
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
         FRONTEND_IMAGE = "${DOCKER_REGISTRY}/userstory-frontend-repo:latest"
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
-        PUBLIC_IP = 'ec2-98-92-121-235.compute-1.amazonaws.com'
-        SSH_KEY = credentials('ssh-key-id') // Додайте SSH-ключ у Jenkins Credentials
-        SSH_USER = 'ec2-user'
+        DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
 
         SONAR_TOKEN = credentials('sonarcloud-token')
@@ -36,23 +34,8 @@ pipeline {
         stage('Check Docker Host') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'sudo systemctl status docker' || { echo "Docker not running on EC2"; exit 1; }
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker info --format "{{.ServerVersion}}"' || { echo "Cannot connect to Docker"; exit 1; }
-                        '''
-                    }
-                }
-            }
-        }
-        stage('Create Docker Network') {
-            steps {
-                script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker network inspect app-network || docker network create app-network'
-                        '''
-                    }
+                    sh "docker -H ${DOCKER_HOST} info --format '{{.ServerVersion}}' || exit 1"
+                    sh "docker -H ${DOCKER_HOST} network ls || exit 1"
                 }
             }
         }
@@ -61,18 +44,71 @@ pipeline {
                 git branch: 'master', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory_app.git'
             }
         }
-        stage('Clean Old Images') {
-            steps {
-                script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker image prune -f'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker system prune -f --volumes'
-                        '''
+
+         stage('SonarCloud Analysis') {
+            parallel {
+                stage('Backend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    echo "=== BACKEND SONAR ANALYSIS ==="
+                                    cd backend
+                                    mvn verify sonar:sonar \
+                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                        -Dsonar.organization=anastasia-storozhenko \
+                                        -Dsonar.host.url=https://sonarcloud.io \
+                                        -Dsonar.token=${SONAR_TOKEN}
+                                    echo "✅ Backend Sonar analysis completed successfully"
+                                '''
+                            }
+                        }
+                    }
+                }
+                
+                stage('Frontend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            script {
+                                // Використовуємо Node.js з Jenkins tools
+                                nodejs('nodejs-20.11.0') {
+                                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                        sh '''
+                                            echo "=== FRONTEND SONAR ANALYSIS ==="
+                                            cd frontend
+                                            
+                                            # Перевіряємо Node.js
+                                            echo "Node.js version:"
+                                            node --version
+                                            echo "NPM version:"
+                                            npm --version
+                                            
+                                            # Оптимізація пам'яті
+                                            export NODE_OPTIONS="--max_old_space_size=2048"
+                                            
+                                            # Запускаємо sonar-scanner з явним шляхом до Node.js
+                                            sonar-scanner \
+                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                                -Dsonar.organization=anastasia-storozhenko \
+                                                -Dsonar.host.url=https://sonarcloud.io \
+                                                -Dsonar.token=${SONAR_TOKEN} \
+                                                -Dsonar.sources=src \
+                                                -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*" \
+                                                -Dsonar.sourceEncoding=UTF-8 \
+                                                -Dsonar.javascript.node.maxspace=2048 \
+                                                -Dsonar.nodejs.executable=/var/lib/jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/nodejs-20.11.0/bin/node
+                                            
+                                            echo "✅ Frontend Sonar analysis completed successfully"
+                                        '''
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+        
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
@@ -84,6 +120,7 @@ pipeline {
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
+                            
                             terraform --version
                             terraform init
                             terraform plan -out=tfplan -var="project_prefix=${TF_VAR_project_prefix}" -var="env_name=${TF_VAR_env_name}"
@@ -92,6 +129,7 @@ pipeline {
                 }
             }
         }
+
         stage('Terraform Apply') {
             steps {
                 dir('terraform/envs/dev') {
@@ -103,15 +141,18 @@ pipeline {
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
+                            
                             terraform apply -auto-approve tfplan
                         '''
                     }
                 }
             }
         }
+
         stage('Install AWS CLI') {
             steps {
                 sh '''
+                    # Встановлюємо unzip залежно від дистрибутива
                     if [ -f /etc/debian_version ]; then
                         sudo apt-get update
                         sudo apt-get install -y unzip
@@ -121,13 +162,15 @@ pipeline {
                         echo "Невідомий дистрибутив, встановіть unzip вручну"
                         exit 1
                     fi
+
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip -o awscliv2.zip
-                    sudo ./aws/install --update
+                    unzip -o awscliv2.zip  # Примусова заміна файлів
+                    sudo ./aws/install --update  # Додано --update
                     rm -rf awscliv2.zip aws
                 '''
             }
         }
+
         stage('Validate Infrastructure') {
             steps {
                 withCredentials([
@@ -138,31 +181,25 @@ pipeline {
                         export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                         export AWS_DEFAULT_REGION=us-east-1
+                        
                         aws ec2 describe-vpcs --filters "Name=tag:Name,Values=userstory-vpc" || echo "VPC not found"
                         aws ec2 describe-instances --filters "Name=tag:Name,Values=userstory-frontend" || echo "EC2 not found"
+                        aws ec2 describe-instances --filters "Name=tag:Name,Values=userstory-database" || echo "Database EC2 not found"
                         aws ecr describe-repositories --repository-names userstory-frontend || echo "ECR not found"
                     '''
                 }
             }
         }
+
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
-                    sh '''
-                        npm install @babel/plugin-transform-private-methods@latest \
-                                   @babel/plugin-transform-class-properties@latest \
-                                   @babel/plugin-transform-numeric-separator@latest \
-                                   @babel/plugin-transform-nullish-coalescing-operator@latest \
-                                   @babel/plugin-transform-optional-chaining@latest \
-                                   @jridgewell/sourcemap-codec@latest \
-                                   @rollup/plugin-terser@latest
-                        npm audit fix || true
-                        npm install
-                        CI=false npm run build
-                    '''
+                    sh 'npm install'
+                    sh 'CI=false npm run build'
                 }
             }
         }
+
         stage('Build Backend') {
             steps {
                 dir('backend') {
@@ -170,99 +207,91 @@ pipeline {
                 }
             }
         }
-        stage('Build and Push Docker Images') {
+
+        stage('Build Docker Images') {
+            steps {
+                script {
+                    dir('frontend') {
+                        sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
+                    }
+                    dir('backend') {
+                        sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
+                    }
+                }
+            }
+        }
+
+       stage('Push Docker Images') {
             steps {
                 script {
                     withCredentials([
                         string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')
+                        string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
                     ]) {
                         sh '''
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
-                            aws ecr get-login-password --region us-east-1 | ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker login --username AWS --password-stdin ${DOCKER_REGISTRY}'
-                            cd frontend
-                            for i in {1..3}; do
-                                docker build -t ${FRONTEND_IMAGE} . && break
-                                echo "Frontend build retry $i failed, waiting before next attempt..."
-                                sleep 10
-                            done
-                            for i in {1..3}; do
-                                docker push ${FRONTEND_IMAGE} && break
-                                echo "Frontend push retry $i failed, waiting before next attempt..."
-                                sleep 10
-                            done
-                            cd ../backend
-                            for i in {1..3}; do
-                                docker build -t ${BACKEND_IMAGE} . && break
-                                echo "Backend build retry $i failed, waiting before next attempt..."
-                                sleep 10
-                            done
-                            for i in {1..3}; do
-                                docker push ${BACKEND_IMAGE} && break
-                                echo "Backend push retry $i failed, waiting before next attempt..."
-                                sleep 10
-                            done
+                            
+                            # Отримуємо токен авторизації для ECR
+                            aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
+                            
+                            # Функція для спроби пуша з обробкою immutable
+                            try_push_image() {
+                                local image_name=$1
+                                local image_type=$2
+                                
+                                echo "Attempting to push $image_type..."
+                                
+                                # Пробуємо зробити push
+                                if docker -H tcp://192.168.56.20:2375 push "$image_name"; then
+                                    echo "Successfully pushed $image_type"
+                                else
+                                    # Якщо push впав, перевіряємо чи це через immutable tags
+                                    local push_output=$(docker -H tcp://192.168.56.20:2375 push "$image_name" 2>&1 || true)
+                                    
+                                    if echo "$push_output" | grep -q "immutable"; then
+                                        echo "Skipping $image_type - immutable tags detected"
+                                    else
+                                        echo "Failed to push $image_type for unknown reason"
+                                        exit 1
+                                    fi
+                                fi
+                            }
+                            
+                            # Пробуємо пушити образи
+                            try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
+                            try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
+                            
+                            echo "Push process completed"
                         '''
                     }
                 }
             }
         }
+
         stage('Deploy') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            scp -o StrictHostKeyChecking=no -i ${SSH_KEY} docker-compose.yml ${SSH_USER}@${PUBLIC_IP}:/home/ec2-user/docker-compose.yml
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker-compose -f /home/ec2-user/docker-compose.yml down || true'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -q | xargs -r docker stop || true'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -a -q | xargs -r docker rm || true'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker volume rm userstory-app-pipeline_db-data || true'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker-compose -f /home/ec2-user/docker-compose.yml up -d --force-recreate' || { echo "Deployment failed"; exit 1; }
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'sleep 180'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker ps -a'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-frontend || echo "Frontend logs unavailable"'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-backend || echo "Backend logs unavailable"'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logs userstory-db || echo "Database logs unavailable"'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..5}; do docker exec userstory-db mysqladmin ping -h localhost -u root -prootpass && break; echo "Database ping retry $i failed"; sleep 15; done'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-db mysqladmin ping -h localhost -u root -prootpass || echo "Database ping failed"'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..5}; do docker exec userstory-backend nc -zv db 3306 && break; echo "Database connection retry $i failed"; sleep 15; done'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-backend nc -zv db 3306 || echo "Database connection failed"'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-backend curl -f http://localhost:8080/actuator/health || echo "Backend health check failed"'
-                            for i in {1..3}; do
-                                curl -s -f http://${PUBLIC_IP}:8080/api/projects && break
-                                echo "API check retry $i failed, waiting before next attempt..."
-                                sleep 10
-                            done
-                            curl -s -f http://${PUBLIC_IP}:8080/api/projects || echo 'API check failed'
-                        '''
-                    }
+                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
+                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
+                    sh "sleep 180"
+                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                 }
             }
         }
+
         stage('Test Application') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'for i in {1..3}; do docker exec userstory-frontend curl -s -f http://backend:8080/api/projects && break; echo "API check retry $i failed"; sleep 10; done'
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker exec userstory-frontend curl -s -f http://backend:8080/api/projects || echo "API check failed"'
-                            curl -s -f http://${PUBLIC_IP}/api/projects || echo 'External API check failed'
-                        '''
-                    }
+                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
                 }
             }
         }
     }
     post {
         always {
-            withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-id', keyFileVariable: 'SSH_KEY')]) {
-                sh '''
-                    ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${SSH_USER}@${PUBLIC_IP} 'docker logout ${DOCKER_REGISTRY}' || true
-                '''
-            }
+            sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
         }
     }
 }

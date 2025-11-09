@@ -9,6 +9,17 @@ output "db_secret_value" {
   sensitive   = true
 }
 
+output "datadog_secret_arn" {
+  description = "ARN of the existing Datadog secret"
+  value       = data.aws_secretsmanager_secret.datadog_api_key.arn
+}
+
+output "datadog_api_key_value" {
+  description = "Datadog API key value (sensitive)"
+  value       = data.aws_secretsmanager_secret_version.datadog_api_key_version.secret_string
+  sensitive   = true
+}
+
 output "db_username" {
   description = "The generated database username"
   value       = var.db_username

@@ -37,6 +37,9 @@ resource "aws_instance" "database_instance" {
     DB_NAME           = "userstory"
     DB_USERNAME       = "userstory_admin"
     ACCOUNT_ID        = "182000022338"
+    DD_SECRET_ARN     = var.datadog_secret_arn
+    DD_ROLE           = "database"
+    DD_ENV            = "dev"
   })
 
   user_data_replace_on_change = true
@@ -67,6 +70,9 @@ resource "aws_instance" "backend_instance" {
     DB_USERNAME     = "userstory_admin"
     DB_PASSWORD     = "devuser"
     ACCOUNT_ID      = "182000022338"
+    DD_SECRET_ARN   = var.datadog_secret_arn
+    DD_ROLE         = "backend"
+    DD_ENV          = "dev"
   })
 
   user_data_replace_on_change = true
@@ -92,6 +98,9 @@ resource "aws_instance" "frontend_instance" {
     ECR_FRONTEND_URL    = var.ecr_frontend_url
     DB_SECRET_ARN       = var.db_secret_arn
     BACKEND_PRIVATE_IP  = aws_instance.backend_instance.private_ip
+    DD_SECRET_ARN       = var.datadog_secret_arn
+    DD_ROLE             = "frontend"
+    DD_ENV              = "dev"
   })
 
   user_data_replace_on_change = true
@@ -114,8 +123,11 @@ resource "aws_instance" "bastion_instance" {
 
   # User Data Script for setting up Nginx Reverse Proxy
   user_data = templatefile("${path.module}/user_data/bastion.sh", {
-    FRONTEND_IP = aws_instance.frontend_instance.private_ip 
-    BACKEND_IP  = aws_instance.backend_instance.private_ip
+    FRONTEND_IP       = aws_instance.frontend_instance.private_ip 
+    BACKEND_IP        = aws_instance.backend_instance.private_ip
+    DD_SECRET_ARN     = var.datadog_secret_arn
+    DD_ROLE           = "bastion"
+    DD_ENV            = "dev"
   })
 
   user_data_replace_on_change = true

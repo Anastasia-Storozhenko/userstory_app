@@ -11,11 +11,12 @@ module "vpc" {
 
 # --- 2. Security Groups Module (Must be first because SG needs VPC Endpoints)
 module "security_groups" {
-  source     = "../../modules/sg"
-  vpc_id     = module.vpc.vpc_id # ID VPC from VPC module
-  my_ip_cidr = var.my_ip_for_ssh
+  source       = "../../modules/sg"
+  vpc_id       = module.vpc.vpc_id # ID VPC from VPC module
+  my_ip_cidr   = var.my_ip_for_ssh
   # Default ports: Backend 8080, DB 3306 - can be overridden here
-  vpc_cidr = var.vpc_cidr
+  vpc_cidr     = var.vpc_cidr
+  project_name = var.project_prefix
 }
 
 # --- 3. Network Module
@@ -68,6 +69,14 @@ module "ec2" {
   ecr_backend_url  = module.ecr.backend_ecr_uri
   db_secret_arn    = "arn:aws:secretsmanager:us-east-1:182000022338:secret:userstory-dev-db-secret-v7-ETNfQm"
   ecr_database_url = module.ecr.database_ecr_uri
+  datadog_secret_arn = module.secrets.datadog_secret_arn
+
+  # Dependencies
+  depends_on = [
+    module.iam,
+    module.security_groups,
+    module.secrets
+  ]
 }
 
 # --- 8. Interface Endpoints (used SG for Endpoints)

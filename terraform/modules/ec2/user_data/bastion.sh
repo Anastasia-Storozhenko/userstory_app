@@ -5,18 +5,21 @@ FRONTEND_IP="${FRONTEND_IP}" # FRONTEND_IP will be automatically available in th
 BACKEND_IP="${BACKEND_IP}"   # Defining a variable passed through Terraform
 echo "--- frontend=${FRONTEND_IP}, backend=${BACKEND_IP} ---"
 
+#### "--- 1. Installing Nginx. Using yum for Amazon Linux 2 ---"
 echo "--- 1. Installing Nginx. Using yum for Amazon Linux 2 ---"
 yum update -y -q
 amazon-linux-extras install nginx1 -y
 systemctl enable nginx
 systemctl start nginx
 
+#### "--- 2. Configuring Nginx to listen on port 80 and proxy to the Frontend ---"
 echo "--- 2. Configuring Nginx to listen on port 80 and proxy to the Frontend ---"
 # NOTE: For Amazon Linux 2, Nginx uses the /etc/nginx/nginx.conf directory
 # Create a new configuration file for Nginx that will act as a Reverse Proxy
 mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak || true
 mkdir -p /etc/nginx/conf.d
 
+#### "--- 3. Clearing the built-in server{} from the main nginx.conf ---"
 echo "--- 3. Clearing the built-in server{} from the main nginx.conf ---"
 
 cat <<'NGINX' > /etc/nginx/nginx.conf
@@ -47,6 +50,7 @@ http {
 }
 NGINX
 
+#### "--- 4. Configuring reverse-proxy.conf ---"
 echo "--- 4. Configuring reverse-proxy.conf ---"
 cat <<'EOF' > /etc/nginx/conf.d/reverse-proxy.conf
 # --- Upstream blocks ---
@@ -122,8 +126,49 @@ server {
 }
 EOF
 
-echo " --- 5. Check and restart Nginx ---"
+#### "--- 5. Check and restart Nginx ---"
+echo "--- 5. Check and restart Nginx ---"
 sudo nginx -t || (echo "Nginx config failed"; exit 1)
 sudo systemctl restart nginx
 
-echo " --- 6. Bastion installation script is complete ---"
+#### "--- 6. Installing DataDog Agent ---"
+echo "--- 6. Installing DataDog Agent ---"
+DD_SITE="us5.datadoghq.com"
+DD_ENV="${DD_ENV}"
+DD_ROLE="${DD_ROLE}"
+AWS_REGION="us-east-1"
+SECRET_ARN="${DD_SECRET_ARN}"
+
+yum install -y curl jq
+
+echo "Fetching Datadog API key from Secrets Manager..."
+for i in {1..5}; do
+  DD_API_KEY=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query 'SecretString' --output text --region "$AWS_REGION" 2>/dev/null | jq -r '.api_key')
+  if [ -n "$DD_API_KEY" ] && [ "$DD_API_KEY" != "null" ]; then
+    echo "Datadog key retrieved successfully."
+    break
+  fi
+  echo "Retry $i... waiting for secret availability"
+  sleep $((2*i))
+done
+if [ -z "$DD_API_KEY" ] || [ "$DD_API_KEY" = "null" ]; then
+  echo "CRITICAL: Failed to retrieve valid Datadog API key"
+  exit 1
+fi
+
+echo "Installing Datadog agent with retrieved key..."
+DD_AGENT_MAJOR_VERSION=7 DD_API_KEY=$DD_API_KEY DD_SITE=$DD_SITE bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
+
+cat <<EOF | sudo tee -a /etc/datadog-agent/datadog.yaml
+tags:
+  - env:$DD_ENV
+  - role:$DD_ROLE
+EOF
+
+systemctl enable datadog-agent
+systemctl restart datadog-agent
+
+echo "DataDog Agent installed and started ---"
+
+#### "--- 0. Bastion installation script is complete ---"
+echo "--- 0. Bastion installation script is complete ---"

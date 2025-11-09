@@ -58,3 +58,8 @@ variable "db_secret_arn" {
   description = "ARN of the Secrets Manager secret containing DB credentials."
   type        = string
 }
+
+variable "datadog_secret_arn" {
+  type        = string
+  description = "ARN of the Datadog API key secret"
+}
