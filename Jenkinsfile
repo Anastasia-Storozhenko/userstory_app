@@ -46,53 +46,57 @@ pipeline {
         }
 
         stage('SonarCloud Analysis') {
-            steps {
+            parallel {
                 stage('Backend Sonar') {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                echo "=== BACKEND SONAR ANALYSIS ==="
-                                cd backend
-                                export MAVEN_OPTS="-Xmx1g -Xms512m"
-                                mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN}
-                                echo "✅ Backend Sonar analysis completed successfully"
-                            '''
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    echo "=== BACKEND SONAR ANALYSIS ==="
+                                    cd backend
+                                    export MAVEN_OPTS="-Xmx1g -Xms512m"
+                                    mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
+                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                        -Dsonar.organization=anastasia-storozhenko \
+                                        -Dsonar.host.url=https://sonarcloud.io \
+                                        -Dsonar.token=${SONAR_TOKEN}
+                                    echo "✅ Backend Sonar analysis completed successfully"
+                                '''
+                            }
                         }
                     }
                 }
                 stage('Frontend Sonar') {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        script {
-                            nodejs('nodejs-20.11.0') {
-                                withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                                    sh '''
-                                        echo "=== FRONTEND SONAR ANALYSIS ==="
-                                        cd frontend
-                                        
-                                        echo "Node.js version:"
-                                        node --version
-                                        echo "NPM version:"
-                                        npm --version
-                                        
-                                        export NODE_OPTIONS="--max_old_space_size=1536"
-                                        
-                                        sonar-scanner \
-                                            -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                            -Dsonar.organization=anastasia-storozhenko \
-                                            -Dsonar.host.url=https://sonarcloud.io \
-                                            -Dsonar.token=${SONAR_TOKEN} \
-                                            -Dsonar.sources=src \
-                                            -Dsonar.exclusions=node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*,**/*.js,**/*.ts,**/*.tsx \
-                                            -Dsonar.sourceEncoding=UTF-8 \
-                                            -Dsonar.javascript.node.maxspace=1536 \
-                                            -Dsonar.nodejs.executable=/var/lib/jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/nodejs-20.11.0/bin/node
-                                        
-                                        echo "✅ Frontend Sonar analysis completed successfully"
-                                    '''
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            script {
+                                nodejs('nodejs-20.11.0') {
+                                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                        sh '''
+                                            echo "=== FRONTEND SONAR ANALYSIS ==="
+                                            cd frontend
+                                            
+                                            echo "Node.js version:"
+                                            node --version
+                                            echo "NPM version:"
+                                            npm --version
+                                            
+                                            export NODE_OPTIONS="--max_old_space_size=1536"
+                                            
+                                            sonar-scanner \
+                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                                -Dsonar.organization=anastasia-storozhenko \
+                                                -Dsonar.host.url=https://sonarcloud.io \
+                                                -Dsonar.token=${SONAR_TOKEN} \
+                                                -Dsonar.sources=src \
+                                                -Dsonar.exclusions=node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*,**/*.js,**/*.ts,**/*.tsx \
+                                                -Dsonar.sourceEncoding=UTF-8 \
+                                                -Dsonar.javascript.node.maxspace=1536 \
+                                                -Dsonar.nodejs.executable=/var/lib/jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/nodejs-20.11.0/bin/node
+                                            
+                                            echo "✅ Frontend Sonar analysis completed successfully"
+                                        '''
+                                    }
                                 }
                             }
                         }
