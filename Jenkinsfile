@@ -220,7 +220,7 @@ pipeline {
         
         stage('Deploy') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 10, unit: 'MINUTES') {
                     script {
                         
                         dir('docker-deploy-files') {
