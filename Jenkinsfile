@@ -47,72 +47,70 @@ pipeline {
 
         stage('SonarCloud Analysis') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
+                timeout(time: 15, unit: 'MINUTES') { // Збільшуємо таймаут до 15 хвилин для надійності
                     script {
-                        parallel(
-                            backend: {
-                                dir('backend') {
+                        // Крок 1: Аналіз бекенду
+                        stage('Backend Sonar Analysis') {
+                            dir('backend') {
+                                withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                    sh '''
+                                        echo "=== BACKEND SONAR ANALYSIS ==="
+                                        export MAVEN_OPTS="-Xmx2g -Xms512m" # Зменшуємо споживання пам’яті
+                                        mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
+                                            -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                            -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                            -Dsonar.organization=anastasia-storozhenko \
+                                            -Dsonar.host.url=https://sonarcloud.io \
+                                            -Dsonar.token=${SONAR_TOKEN} \
+                                            -Dsonar.sources=src/main/java \
+                                            -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** \
+                                            -Dsonar.java.source=17 \
+                                            -Dsonar.coverage.exclusions=**/* \
+                                            -Dsonar.cpd.exclusions=**/* \
+                                            -Dsonar.textenterprise.skip=true \
+                                            -Dsonar.java.spotbugs.skip=true \
+                                            -Dsonar.java.checkstyle.skip=true \
+                                            -Dsonar.java.pmd.skip=true \
+                                            -Dsonar.dbd.skip=true \
+                                            -Dsonar.surefire.skip=true \
+                                            -Dsonar.jacoco.skip=true \
+                                            -Dsonar.scm.disabled=true \
+                                            -Dsonar.scm.provider=disabled \
+                                            -X # Увімкнення детального логування
+                                        echo "✅ Backend Sonar analysis completed"
+                                    '''
+                                }
+                            }
+                        }
+                        
+                        // Крок 2: Аналіз фронтенду
+                        stage('Frontend Sonar Analysis') {
+                            dir('frontend') {
+                                nodejs('nodejs-20.11.0') {
                                     withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                                         sh '''
-                                            echo "=== BACKEND SONAR ANALYSIS ==="
-                                            export MAVEN_OPTS="-Xmx3g -Xms1g"
-                                            
-                                            # ШВИДКИЙ АНАЛІЗ - ВИМИКАЄМО ВСІ ПОВІЛЬНІ ПЕРЕВІРКИ
-                                            mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
-                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                                -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                            echo "=== FRONTEND SONAR ANALYSIS ==="
+                                            export NODE_OPTIONS="--max_old_space_size=1536" # Зменшуємо до 1.5 ГБ
+                                            npx sonar-scanner@6.2.1 -X \ # Використовуємо новітню версію з детальним логуванням
+                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
                                                 -Dsonar.organization=anastasia-storozhenko \
                                                 -Dsonar.host.url=https://sonarcloud.io \
                                                 -Dsonar.token=${SONAR_TOKEN} \
-                                                -Dsonar.sources=src/main/java \
-                                                -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** \
-                                                -Dsonar.java.source=17 \
+                                                -Dsonar.sources=src \
+                                                -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json \
+                                                -Dsonar.sourceEncoding=UTF-8 \
                                                 -Dsonar.coverage.exclusions=**/* \
                                                 -Dsonar.cpd.exclusions=**/* \
-                                                -Dsonar.textenterprise.skip=true \
-                                                -Dsonar.java.spotbugs.skip=true \
-                                                -Dsonar.java.checkstyle.skip=true \
-                                                -Dsonar.java.pmd.skip=true \
-                                                -Dsonar.dbd.skip=true \
-                                                -Dsonar.surefire.skip=true \
-                                                -Dsonar.jacoco.skip=true \
-                                                -Dsonar.scm.disabled=true \
-                                                -Dsonar.scm.provider=disabled
-                                            echo "✅ Backend Sonar analysis completed"
+                                                -Dsonar.css.skip=true \
+                                                -Dsonar.html.skip=true \
+                                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                                -Dsonar.scm.disabled=true
+                                            echo "✅ Frontend Sonar analysis completed"
                                         '''
                                     }
                                 }
-                            },
-                            frontend: {
-                                dir('frontend') {
-                                    nodejs('nodejs-20.11.0') {
-                                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                                            sh '''
-                                                echo "=== FRONTEND SONAR ANALYSIS ==="
-                                                export NODE_OPTIONS="--max_old_space_size=2048"
-                                                
-                                                # ШВИДКИЙ АНАЛІЗ ДЛЯ FRONTEND
-                                                npx sonar-scanner@latest \
-                                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                                    -Dsonar.organization=anastasia-storozhenko \
-                                                    -Dsonar.host.url=https://sonarcloud.io \
-                                                    -Dsonar.token=${SONAR_TOKEN} \
-                                                    -Dsonar.sources=src \
-                                                    -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json \
-                                                    -Dsonar.sourceEncoding=UTF-8 \
-                                                    -Dsonar.coverage.exclusions=**/* \
-                                                    -Dsonar.cpd.exclusions=**/* \
-                                                    -Dsonar.css.skip=true \
-                                                    -Dsonar.html.skip=true \
-                                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                                    -Dsonar.scm.disabled=true
-                                                echo "✅ Frontend Sonar analysis completed"
-                                            '''
-                                        }
-                                    }
-                                }
                             }
-                        )
+                        }
                     }
                 }
             }
