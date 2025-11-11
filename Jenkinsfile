@@ -97,7 +97,7 @@ pipeline {
             }
        }    
 
-        stage('Terraform Init & Plan') {
+         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
                     withCredentials([
@@ -152,8 +152,8 @@ pipeline {
                     fi
 
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip -o awscliv2.zip  
-                    sudo ./aws/install --update  
+                    unzip -o awscliv2.zip  # Примусова заміна файлів
+                    sudo ./aws/install --update  # Додано --update
                     rm -rf awscliv2.zip aws
                 '''
             }
@@ -221,7 +221,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            
+                            # Отримуємо токен авторизації для ECR
                             aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
                             
                             # Функція для спроби пуша з обробкою immutable
@@ -231,7 +231,7 @@ pipeline {
                                 
                                 echo "Attempting to push $image_type..."
                                 
-                                
+                                # Пробуємо зробити push
                                 if docker -H tcp://192.168.56.20:2375 push "$image_name"; then
                                     echo "Successfully pushed $image_type"
                                 else
@@ -247,7 +247,7 @@ pipeline {
                                 fi
                             }
                             
-                            
+                            # Пробуємо пушити образи
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
@@ -258,54 +258,21 @@ pipeline {
             }
         }
 
-        
-        stage('Checkout Docker Repo for Deploy') {
-            steps {
-                dir('docker-deploy-files') {
-                    git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/Anastasia-Storozhenko/userstory-app-docker.git'
-                    sh 'ls -la'  
-                }
-            }
-        }
-        
         stage('Deploy') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    script {
-                        dir('docker-deploy-files') {
-                            sh '''
-                                echo "=== DEPLOY USING DOCKER-COMPOSE FROM SEPARATE REPO ==="
-                                
-                                # Переконуємося, що docker-compose.yml існує
-                                ls -la docker-compose.yml || echo "docker-compose.yml not found in repo"
-                                
-                                # Виконуємо docker-compose через DOCKER_HOST
-                                export DOCKER_CLIENT_TIMEOUT=300
-                                export COMPOSE_HTTP_TIMEOUT=300
-                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
-                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --build
-                                
-                                # Перевіряємо статус контейнерів
-                                docker -H ${DOCKER_HOST} ps -a
-                                sleep 10  
-                                echo "Deploy completed successfully"
-                            '''
-                        }
-                    }
+                script {
+                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
+                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
+                    sh "sleep 180"
+                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
                 }
             }
         }
-        
+
         stage('Test Application') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
-                    script {
-                        sh '''
-                            echo "=== TESTING APPLICATION ==="
-                            docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://userstory-backend:8080/api/projects || echo "API check failed (backend on port 8080)"
-                            curl -s http://192.168.56.20:8080 || echo "Frontend check failed"
-                        '''
-                    }
+                script {
+                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
                 }
             }
         }
@@ -313,8 +280,6 @@ pipeline {
     post {
         always {
             sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
-            // Очищення тимчасової папки з Docker-репозиторієм
-            sh "rm -rf docker-deploy-files || true"
         }
     }
 }
