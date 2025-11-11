@@ -16,6 +16,7 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
+        JAVA_OPTS = '-Xmx2g -Xms512m'
 
         SONAR_TOKEN = credentials('sonarcloud-token')
         SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
@@ -45,37 +46,16 @@ pipeline {
             }
         }
 
-        stage('SonarCloud Analysis') {
-stage('Backend Sonar Analysis') {
+       stage('Backend Sonar Analysis') {
             steps {
-                timeout(time: 8, unit: 'MINUTES') { // 8 хвилин для бекенду
+                timeout(time: 8, unit: 'MINUTES') {
                     dir('backend') {
                         withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                             sh $/
                                 echo "=== BACKEND SONAR ANALYSIS ==="
                                 export MAVEN_OPTS="-Xmx2g -Xms512m"
-                                mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN} \
-                                    -Dsonar.sources=src/main/java \
-                                    -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** \
-                                    -Dsonar.java.source=17 \
-                                    -Dsonar.coverage.exclusions=**/* \
-                                    -Dsonar.cpd.exclusions=**/* \
-                                    -Dsonar.textenterprise.skip=true \
-                                    -Dsonar.java.spotbugs.skip=true \
-                                    -Dsonar.java.checkstyle.skip=true \
-                                    -Dsonar.java.pmd.skip=true \
-                                    -Dsonar.dbd.skip=true \
-                                    -Dsonar.surefire.skip=true \
-                                    -Dsonar.jacoco.skip=true \
-                                    -Dsonar.scm.disabled=true \
-                                    -Dsonar.scm.provider=disabled \
-                                    -X
-                                echo "✅ Backend Sonar analysis completed"
+                                mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend -Dsonar.organization=anastasia-storozhenko -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=${SONAR_TOKEN} -Dsonar.sources=src/main/java -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** -Dsonar.java.source=17 -Dsonar.coverage.exclusions=**/* -Dsonar.cpd.exclusions=**/* -Dsonar.textenterprise.skip=true -Dsonar.java.spotbugs.skip=true -Dsonar.java.checkstyle.skip=true -Dsonar.java.pmd.skip=true -Dsonar.dbd.skip=true -Dsonar.surefire.skip=true -Dsonar.jacoco.skip=true -Dsonar.scm.disabled=true -Dsonar.scm.provider=disabled -X
+                                echo "Backend Sonar analysis completed"
                             /$
                         }
                     }
@@ -83,31 +63,17 @@ stage('Backend Sonar Analysis') {
             }
         }
 
-        // Окремий етап 2: Аналіз фронтенду
         stage('Frontend Sonar Analysis') {
             steps {
-                timeout(time: 8, unit: 'MINUTES') { // 8 хвилин для фронтенду
+                timeout(time: 8, unit: 'MINUTES') {
                     dir('frontend') {
                         nodejs('nodejs-20.11.0') {
                             withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                                 sh $/
                                     echo "=== FRONTEND SONAR ANALYSIS ==="
                                     export NODE_OPTIONS="--max_old_space_size=1536"
-                                    npx sonar-scanner@6.2.1 -X \
-                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                        -Dsonar.organization=anastasia-storozhenko \
-                                        -Dsonar.host.url=https://sonarcloud.io \
-                                        -Dsonar.token=${SONAR_TOKEN} \
-                                        -Dsonar.sources=src \
-                                        -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json \
-                                        -Dsonar.sourceEncoding=UTF-8 \
-                                        -Dsonar.coverage.exclusions=**/* \
-                                        -Dsonar.cpd.exclusions=**/* \
-                                        -Dsonar.css.skip=true \
-                                        -Dsonar.html.skip=true \
-                                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                        -Dsonar.scm.disabled=true
-                                    echo "✅ Frontend Sonar analysis completed"
+                                    npx sonar-scanner@6.2.1 -X -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend -Dsonar.organization=anastasia-storozhenko -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=${SONAR_TOKEN} -Dsonar.sources=src -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json -Dsonar.sourceEncoding=UTF-8 -Dsonar.coverage.exclusions=**/* -Dsonar.cpd.exclusions=**/* -Dsonar.css.skip=true -Dsonar.html.skip=true -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info -Dsonar.scm.disabled=true
+                                    echo "Frontend Sonar analysis completed"
                                 /$
                             }
                         }
@@ -115,8 +81,7 @@ stage('Backend Sonar Analysis') {
                 }
             }
         }
-        
-        
+
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
