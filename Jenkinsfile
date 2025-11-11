@@ -46,25 +46,23 @@ pipeline {
             }
         }
 
-       stage('SonarCloud Analysis') {
+        stage('SonarCloud Analysis') {
             steps {
                 timeout(time: 15, unit: 'MINUTES') {
                     script {
                         withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                             sh '''
-                                # Кеш node_modules
-                                if [ ! -d "frontend/node_modules" ]; then
-                                    cd frontend && npm ci
-                                else
-                                    echo "Using cached node_modules"
-                                fi
+                                # Очистити node_modules і package-lock.json для уникнення проблем із кешем
+                                cd frontend
+                                rm -rf node_modules package-lock.json
+                                npm ci
 
                                 # Кеш sonar
                                 export SONAR_USER_HOME=/var/lib/jenkins/.sonar
                                 mkdir -p $SONAR_USER_HOME/cache
 
                                 # Бекенд
-                                cd backend
+                                cd ../backend
                                 mvn verify sonar:sonar \
                                     -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
                                     -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
@@ -89,13 +87,13 @@ pipeline {
                                     -Dsonar.sourceEncoding=UTF-8 \
                                     -Dsonar.ws.timeout=300 \
                                     -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                    -X  echo "Frontend Sonar failed" || true
+                                    -X || echo "Frontend Sonar failed"
                             '''
                         }
                     }
                 }
             }
-       }    
+        }
 
          stage('Terraform Init & Plan') {
             steps {
