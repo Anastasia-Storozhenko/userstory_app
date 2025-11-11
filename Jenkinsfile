@@ -45,6 +45,63 @@ pipeline {
             }
         }
 
+        stage('SonarCloud Analysis') {
+            parallel {
+                stage('Backend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh '''
+                                    echo "=== BACKEND SONAR ANALYSIS ==="
+                                    cd backend
+                                    export MAVEN_OPTS="-Xmx1g -Xms512m"
+                                    mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
+                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                        -Dsonar.organization=anastasia-storozhenko \
+                                        -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                        -Dsonar.host.url=https://sonarcloud.io \
+                                        -Dsonar.token=${SONAR_TOKEN}
+                                    echo "Backend Sonar analysis completed successfully"
+                                '''
+                            }
+                        }
+                    }
+                }
+                stage('Frontend Sonar') {
+                    steps {
+                        timeout(time: 10, unit: 'MINUTES') {
+                            script {
+                                nodejs('nodejs-20.11.0') {
+                                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                        sh '''
+                                            echo "=== FRONTEND SONAR ANALYSIS ==="
+                                            cd frontend
+                                            echo "Node.js version:"
+                                            node --version
+                                            echo "NPM version:"
+                                            npm --version
+                                            export NODE_OPTIONS="--max_old_space_size=1536"
+                                            sonar-scanner \
+                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                                -Dsonar.organization=anastasia-storozhenko \
+                                                -Dsonar.host.url=https://sonarcloud.io \
+                                                -Dsonar.token=${SONAR_TOKEN} \
+                                                -Dsonar.sources=src \
+                                                -Dsonar.exclusions=node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*,**/*.js,**/*.ts,**/*.tsx \
+                                                -Dsonar.sourceEncoding=UTF-8 \
+                                                -Dsonar.javascript.node.maxspace=1536 \
+                                                -Dsonar.nodejs.executable=/var/lib/jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/nodejs-20.11.0/bin/node
+                                            echo "Frontend Sonar analysis completed successfully"
+                                        '''
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         
         
         stage('Terraform Init & Plan') {
@@ -222,7 +279,6 @@ pipeline {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     script {
-                        
                         dir('docker-deploy-files') {
                             sh '''
                                 echo "=== DEPLOY USING DOCKER-COMPOSE FROM SEPARATE REPO ==="
@@ -234,7 +290,7 @@ pipeline {
                                 export DOCKER_CLIENT_TIMEOUT=300
                                 export COMPOSE_HTTP_TIMEOUT=300
                                 docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true
-                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d
+                                docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --build
                                 
                                 # Перевіряємо статус контейнерів
                                 docker -H ${DOCKER_HOST} ps -a
@@ -253,9 +309,7 @@ pipeline {
                     script {
                         sh '''
                             echo "=== TESTING APPLICATION ==="
-                            # Тест API через DOCKER_HOST
-                            docker -H ${DOCKER_HOST} exec frontend-web curl -s http://localhost:8081/api/projects || echo "API check failed (backend on port 8081)"
-                            # Альтернатива: тест з хоста
+                            docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://userstory-backend:8080/api/projects || echo "API check failed (backend on port 8080)"
                             curl -s http://192.168.56.20:8080 || echo "Frontend check failed"
                         '''
                     }
