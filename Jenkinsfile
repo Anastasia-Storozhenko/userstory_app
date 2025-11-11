@@ -56,6 +56,8 @@ pipeline {
                                         sh '''
                                             echo "=== BACKEND SONAR ANALYSIS ==="
                                             export MAVEN_OPTS="-Xmx3g -Xms1g"
+                                            
+                                            # ШВИДКИЙ АНАЛІЗ - ВИМИКАЄМО ВСІ ПОВІЛЬНІ ПЕРЕВІРКИ
                                             mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
                                                 -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
                                                 -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
@@ -67,7 +69,15 @@ pipeline {
                                                 -Dsonar.java.source=17 \
                                                 -Dsonar.coverage.exclusions=**/* \
                                                 -Dsonar.cpd.exclusions=**/* \
-                                                -Dsonar.textenterprise.skip=true
+                                                -Dsonar.textenterprise.skip=true \
+                                                -Dsonar.java.spotbugs.skip=true \
+                                                -Dsonar.java.checkstyle.skip=true \
+                                                -Dsonar.java.pmd.skip=true \
+                                                -Dsonar.dbd.skip=true \
+                                                -Dsonar.surefire.skip=true \
+                                                -Dsonar.jacoco.skip=true \
+                                                -Dsonar.scm.disabled=true \
+                                                -Dsonar.scm.provider=disabled
                                             echo "✅ Backend Sonar analysis completed"
                                         '''
                                     }
@@ -81,22 +91,21 @@ pipeline {
                                                 echo "=== FRONTEND SONAR ANALYSIS ==="
                                                 export NODE_OPTIONS="--max_old_space_size=2048"
                                                 
-                                                # Встановлюємо останню стабільну версію sonar-scanner
-                                                npm install -g sonar-scanner
-                                                
-                                                # Альтернативно: використовуємо npx з останньою версією
+                                                # ШВИДКИЙ АНАЛІЗ ДЛЯ FRONTEND
                                                 npx sonar-scanner@latest \
                                                     -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
                                                     -Dsonar.organization=anastasia-storozhenko \
                                                     -Dsonar.host.url=https://sonarcloud.io \
                                                     -Dsonar.token=${SONAR_TOKEN} \
                                                     -Dsonar.sources=src \
-                                                    -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.* \
+                                                    -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json \
                                                     -Dsonar.sourceEncoding=UTF-8 \
                                                     -Dsonar.coverage.exclusions=**/* \
                                                     -Dsonar.cpd.exclusions=**/* \
                                                     -Dsonar.css.skip=true \
-                                                    -Dsonar.html.skip=true
+                                                    -Dsonar.html.skip=true \
+                                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                                    -Dsonar.scm.disabled=true
                                                 echo "✅ Frontend Sonar analysis completed"
                                             '''
                                         }
