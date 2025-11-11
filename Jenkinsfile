@@ -70,7 +70,7 @@ pipeline {
                                     -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
                                     -Dsonar.organization=anastasia-storozhenko \
                                     -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN}  true
+                                    -Dsonar.token=${SONAR_TOKEN}
 
                                 # Фронтенд — з таймаутами
                                 cd ../frontend
