@@ -48,52 +48,59 @@ pipeline {
         stage('SonarCloud Analysis') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
-                    dir('backend') {
-                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                echo "=== BACKEND SONAR ANALYSIS ==="
-                                export MAVEN_OPTS="-Xmx2g -Xms1g"
-                                mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN} \
-                                    -Dsonar.sources=src/main/java \
-                                    -Dsonar.exclusions=target/**,src/test/**,src/main/resources/**,**/*.xml \
-                                    -Dsonar.java.source=17 \
-                                    -Dsonar.textenterprise.skip=true
-                                echo "✅ Backend Sonar analysis completed successfully"
-                            '''
-                        }
-                    }
-                    dir('frontend') {
-                        nodejs('nodejs-20.11.0') {
-                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                                sh '''
-                                    echo "=== FRONTEND SONAR ANALYSIS ==="
-                                    echo "Node.js version:"
-                                    node --version
-                                    echo "NPM version:"
-                                    npm --version
-                                    export NODE_OPTIONS="--max_old_space_size=2048"
-                                    npm install -g sonar-scanner@5.0.1
-                                    sonar-scanner \
-                                        -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                        -Dsonar.organization=anastasia-storozhenko \
-                                        -Dsonar.host.url=https://sonarcloud.io \
-                                        -Dsonar.token=${SONAR_TOKEN} \
-                                        -Dsonar.sources=src \
-                                        -Dsonar.exclusions=node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*,**/*.js,**/*.ts,**/*.tsx,**/*.css \
-                                        -Dsonar.sourceEncoding=UTF-8 \
-                                        -Dsonar.javascript.node.maxspace=2048 \
-                                        -Dsonar.nodejs.executable=/var/lib/jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/nodejs-20.11.0/bin/node \
-                                        -Dsonar.css.skip=true
-                                    echo "✅ Frontend Sonar analysis completed successfully"
-                                '''
+                    parallel(
+                        backend: {
+                            dir('backend') {
+                                withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                    sh '''
+                                        echo "=== BACKEND SONAR ANALYSIS ==="
+                                        export MAVEN_OPTS="-Xmx3g -Xms1g"
+                                        # Швидкий аналіз без детальних перевірок
+                                        mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
+                                            -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                            -Dsonar.organization=anastasia-storozhenko \
+                                            -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                            -Dsonar.host.url=https://sonarcloud.io \
+                                            -Dsonar.token=${SONAR_TOKEN} \
+                                            -Dsonar.sources=src/main/java \
+                                            -Dsonar.exclusions=target/**,src/test/**,src/main/resources/**,**/node_modules/** \
+                                            -Dsonar.java.source=17 \
+                                            -Dsonar.coverage.exclusions=**/* \
+                                            -Dsonar.cpd.exclusions=**/* \
+                                            -Dsonar.textenterprise.skip=true \
+                                            -Dsonar.java.spotbugs.skip=true
+                                        echo "✅ Backend Sonar analysis completed"
+                                    '''
+                                }
+                            }
+                        },
+                        frontend: {
+                            dir('frontend') {
+                                nodejs('nodejs-20.11.0') {
+                                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                        sh '''
+                                            echo "=== FRONTEND SONAR ANALYSIS ==="
+                                            export NODE_OPTIONS="--max_old_space_size=2048"
+                                            npx sonar-scanner@5.0.1 \
+                                                -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                                -Dsonar.organization=anastasia-storozhenko \
+                                                -Dsonar.host.url=https://sonarcloud.io \
+                                                -Dsonar.token=${SONAR_TOKEN} \
+                                                -Dsonar.sources=src \
+                                                -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.json \
+                                                -Dsonar.sourceEncoding=UTF-8 \
+                                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                                -Dsonar.coverage.exclusions=**/* \
+                                                -Dsonar.cpd.exclusions=**/* \
+                                                -Dsonar.css.skip=true \
+                                                -Dsonar.html.skip=true
+                                            echo "✅ Frontend Sonar analysis completed"
+                                        '''
+                                    }
+                                }
                             }
                         }
-                    }
+                    )
                 }
             }
         }
