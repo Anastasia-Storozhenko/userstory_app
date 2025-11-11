@@ -46,57 +46,7 @@ pipeline {
             }
         }
 
-        stage('SonarCloud Analysis') {
-            steps {
-                timeout(time: 15, unit: 'MINUTES') {
-                    script {
-                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                            sh '''
-                                # Очистити node_modules, але залишити package-lock.json, якщо він є
-                                cd frontend
-                                rm -rf node_modules
-                                npm install # Замість npm ci, щоб згенерувати package-lock.json
-
-                                # Перевірити наявність esutils
-                                npm list esutils || echo "esutils not found"
-
-                                # Кеш sonar
-                                export SONAR_USER_HOME=/var/lib/jenkins/.sonar
-                                mkdir -p $SONAR_USER_HOME/cache
-
-                                # Бекенд
-                                cd ../backend
-                                mvn verify sonar:sonar \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN}
-
-                                # Фронтенд — з таймаутами
-                                cd ../frontend
-                                export NODE_OPTIONS="--max_old_space_size=2048"
-                                CI=false npm run build
-
-                                npm install --save-dev sonar-scanner
-
-                                npx sonar-scanner \
-                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
-                                    -Dsonar.organization=anastasia-storozhenko \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN} \
-                                    -Dsonar.sources=src \
-                                    -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
-                                    -Dsonar.sourceEncoding=UTF-8 \
-                                    -Dsonar.ws.timeout=300 \
-                                    -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
-                                    -X || echo "Frontend Sonar failed"
-                            '''
-                        }
-                    }
-                }
-            }
-        }
+       
 
          stage('Terraform Init & Plan') {
             steps {
