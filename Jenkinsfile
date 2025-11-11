@@ -56,7 +56,6 @@ pipeline {
                                         sh '''
                                             echo "=== BACKEND SONAR ANALYSIS ==="
                                             export MAVEN_OPTS="-Xmx3g -Xms1g"
-                                            # Швидкий аналіз без детальних перевірок
                                             mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests \
                                                 -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
                                                 -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
@@ -64,12 +63,11 @@ pipeline {
                                                 -Dsonar.host.url=https://sonarcloud.io \
                                                 -Dsonar.token=${SONAR_TOKEN} \
                                                 -Dsonar.sources=src/main/java \
-                                                -Dsonar.exclusions=target/**,src/test/**,src/main/resources/**,**/node_modules/** \
+                                                -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** \
                                                 -Dsonar.java.source=17 \
                                                 -Dsonar.coverage.exclusions=**/* \
                                                 -Dsonar.cpd.exclusions=**/* \
-                                                -Dsonar.textenterprise.skip=true \
-                                                -Dsonar.java.spotbugs.skip=true
+                                                -Dsonar.textenterprise.skip=true
                                             echo "✅ Backend Sonar analysis completed"
                                         '''
                                     }
@@ -82,15 +80,19 @@ pipeline {
                                             sh '''
                                                 echo "=== FRONTEND SONAR ANALYSIS ==="
                                                 export NODE_OPTIONS="--max_old_space_size=2048"
-                                                npx sonar-scanner@5.0.1 \
+                                                
+                                                # Встановлюємо останню стабільну версію sonar-scanner
+                                                npm install -g sonar-scanner
+                                                
+                                                # Альтернативно: використовуємо npx з останньою версією
+                                                npx sonar-scanner@latest \
                                                     -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
                                                     -Dsonar.organization=anastasia-storozhenko \
                                                     -Dsonar.host.url=https://sonarcloud.io \
                                                     -Dsonar.token=${SONAR_TOKEN} \
                                                     -Dsonar.sources=src \
-                                                    -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.json \
+                                                    -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.* \
                                                     -Dsonar.sourceEncoding=UTF-8 \
-                                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                                                     -Dsonar.coverage.exclusions=**/* \
                                                     -Dsonar.cpd.exclusions=**/* \
                                                     -Dsonar.css.skip=true \
