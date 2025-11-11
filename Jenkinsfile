@@ -52,10 +52,13 @@ pipeline {
                     script {
                         withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                             sh '''
-                                # Очистити node_modules і package-lock.json для уникнення проблем із кешем
+                                # Очистити node_modules, але залишити package-lock.json, якщо він є
                                 cd frontend
-                                rm -rf node_modules package-lock.json
-                                npm ci
+                                rm -rf node_modules
+                                npm install # Замість npm ci, щоб згенерувати package-lock.json
+
+                                # Перевірити наявність esutils
+                                npm list esutils || echo "esutils not found"
 
                                 # Кеш sonar
                                 export SONAR_USER_HOME=/var/lib/jenkins/.sonar
