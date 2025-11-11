@@ -46,8 +46,6 @@ pipeline {
             }
         }
 
-       
-
          stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
