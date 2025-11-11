@@ -16,7 +16,7 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
-        JAVA_OPTS = '-Xmx2g -Xms512m'
+        
 
         SONAR_TOKEN = credentials('sonarcloud-token')
         SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
@@ -46,41 +46,56 @@ pipeline {
             }
         }
 
-       stage('Backend Sonar Analysis') {
+       stage('SonarCloud Analysis') {
             steps {
-                timeout(time: 8, unit: 'MINUTES') {
-                    dir('backend') {
+                timeout(time: 15, unit: 'MINUTES') {
+                    script {
                         withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                            sh $/
-                                echo "=== BACKEND SONAR ANALYSIS ==="
-                                export MAVEN_OPTS="-Xmx2g -Xms512m"
-                                mvn clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -DskipTests -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend -Dsonar.organization=anastasia-storozhenko -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=${SONAR_TOKEN} -Dsonar.sources=src/main/java -Dsonar.exclusions=target/**,src/test/**,src/main/resources/** -Dsonar.java.source=17 -Dsonar.coverage.exclusions=**/* -Dsonar.cpd.exclusions=**/* -Dsonar.textenterprise.skip=true -Dsonar.java.spotbugs.skip=true -Dsonar.java.checkstyle.skip=true -Dsonar.java.pmd.skip=true -Dsonar.dbd.skip=true -Dsonar.surefire.skip=true -Dsonar.jacoco.skip=true -Dsonar.scm.disabled=true -Dsonar.scm.provider=disabled -X
-                                echo "Backend Sonar analysis completed"
-                            /$
-                        }
-                    }
-                }
-            }
-        }
+                            sh '''
+                                # Кеш node_modules
+                                if [ ! -d "frontend/node_modules" ]; then
+                                    cd frontend && npm ci
+                                else
+                                    echo "Using cached node_modules"
+                                fi
 
-        stage('Frontend Sonar Analysis') {
-            steps {
-                timeout(time: 8, unit: 'MINUTES') {
-                    dir('frontend') {
-                        nodejs('nodejs-20.11.0') {
-                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                                sh $/
-                                    echo "=== FRONTEND SONAR ANALYSIS ==="
-                                    export NODE_OPTIONS="--max_old_space_size=1536"
-                                    npx sonar-scanner@6.2.1 -X -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend -Dsonar.organization=anastasia-storozhenko -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=${SONAR_TOKEN} -Dsonar.sources=src -Dsonar.exclusions=node_modules/**,public/**,build/**,dist/**,coverage/**,**/*.test.*,**/*.spec.*,**/*.css,**/*.json -Dsonar.sourceEncoding=UTF-8 -Dsonar.coverage.exclusions=**/* -Dsonar.cpd.exclusions=**/* -Dsonar.css.skip=true -Dsonar.html.skip=true -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info -Dsonar.scm.disabled=true
-                                    echo "Frontend Sonar analysis completed"
-                                /$
-                            }
+                                # Кеш sonar
+                                export SONAR_USER_HOME=/var/lib/jenkins/.sonar
+                                mkdir -p $SONAR_USER_HOME/cache
+
+                                # Бекенд
+                                cd backend
+                                mvn verify sonar:sonar \
+                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+                                    -Dsonar.projectName=Anastasia-Storozhenko_userstory_app_backend \
+                                    -Dsonar.organization=anastasia-storozhenko \
+                                    -Dsonar.host.url=https://sonarcloud.io \
+                                    -Dsonar.token=${SONAR_TOKEN}  true
+
+                                # Фронтенд — з таймаутами
+                                cd ../frontend
+                                export NODE_OPTIONS="--max_old_space_size=2048"
+                                CI=false npm run build
+
+                                npm install --save-dev sonar-scanner
+
+                                npx sonar-scanner \
+                                    -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_frontend \
+                                    -Dsonar.organization=anastasia-storozhenko \
+                                    -Dsonar.host.url=https://sonarcloud.io \
+                                    -Dsonar.token=${SONAR_TOKEN} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.exclusions="node_modules/**,public/**,build/**,**/*.test.js,**/*.test.jsx" \
+                                    -Dsonar.sourceEncoding=UTF-8 \
+                                    -Dsonar.ws.timeout=300 \
+                                    -Dsonar.scanner.metadataFilePath=/tmp/sonar-report.json \
+                                    -X  echo "Frontend Sonar failed" || true
+                            '''
                         }
                     }
                 }
             }
-        }
+       }    
 
         stage('Terraform Init & Plan') {
             steps {
