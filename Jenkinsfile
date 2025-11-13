@@ -16,12 +16,6 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_REGISTRY}/userstory-backend-repo:latest"
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
-        
-
-        SONAR_TOKEN = credentials('sonarcloud-token')
-        SONAR_PROJECT_KEY = 'Anastasia-Storozhenko_userstory_app'
-        SONAR_ORG = 'anastasia-storozhenko'
-        SONAR_HOST_URL = 'https://sonarcloud.io'
 
         TF_VAR_project_prefix = 'userstory'
         TF_VAR_env_name = 'dev'
