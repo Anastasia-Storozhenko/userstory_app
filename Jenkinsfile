@@ -8,7 +8,7 @@ pipeline {
     }
     environment {
         DB_USER = credentials('db-credentials')
-        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.195:3306/userstory'  
+        DB_USERSTORYPROJ_URL = 'jdbc:mariadb://10.0.2.195:3306/userstory'  // IP з EC2
         DB_USERSTORYPROJ_USER = "${DB_USER_USR}"
         DB_USERSTORYPROJ_PASSWORD = "${DB_USER_PSW}"
         DOCKER_REGISTRY = '182000022338.dkr.ecr.us-east-1.amazonaws.com'
@@ -41,8 +41,6 @@ pipeline {
             }
         }
 
-        
-        
         stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
@@ -98,8 +96,8 @@ pipeline {
                     fi
 
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip -o awscliv2.zip  
-                    sudo ./aws/install --update  
+                    unzip -o awscliv2.zip  # Примусова заміна файлів
+                    sudo ./aws/install --update  # Додано --update
                     rm -rf awscliv2.zip aws
                 '''
             }
@@ -167,7 +165,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            
+                            # Отримуємо токен авторизації для ECR
                             aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
                             
                             # Функція для спроби пуша з обробкою immutable
@@ -177,7 +175,7 @@ pipeline {
                                 
                                 echo "Attempting to push $image_type..."
                                 
-                                
+                                # Пробуємо зробити push
                                 if docker -H tcp://192.168.56.20:2375 push "$image_name"; then
                                     echo "Successfully pushed $image_type"
                                 else
@@ -193,18 +191,17 @@ pipeline {
                                 fi
                             }
                             
-                            
+                            # Пробуємо пушити образи
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
-                            echo "Push process completed"
+                            echo "🎉 Push process completed"
                         '''
                     }
                 }
             }
         }
 
-        
         stage('Deploy') {
             steps {
                 script {
@@ -215,19 +212,11 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Test Application') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
-                    script {
-                        sh '''
-                            echo "=== TESTING APPLICATION ==="
-                            # Тест API через DOCKER_HOST
-                            docker -H ${DOCKER_HOST} exec frontend-web curl -s http://localhost:8081/api/projects || echo "API check failed (backend on port 8081)"
-                            # Альтернатива: тест з хоста
-                            curl -s http://192.168.56.20:8080 || echo "Frontend check failed"
-                        '''
-                    }
+                script {
+                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
                 }
             }
         }
@@ -235,8 +224,6 @@ pipeline {
     post {
         always {
             sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
-            // Очищення тимчасової папки з Docker-репозиторієм
-            sh "rm -rf docker-deploy-files || true"
         }
     }
 }
