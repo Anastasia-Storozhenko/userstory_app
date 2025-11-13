@@ -24,10 +24,34 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Maven
-        uses: stefanzweifel/maven-settings-action@v1
+      - name: Install Maven 3.6.3
+        run: |
+          wget https://archive.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
+          tar xzvf apache-maven-3.6.3-bin.tar.gz
+          export PATH=$PWD/apache-maven-3.6.3/bin:$PATH
+          mvn --version
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
         with:
-          maven-version: '3.6.3'
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Run SonarCloud Analysis for Backend
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "=== BACKEND SONAR ANALYSIS ==="
+          cd backend
+          export PATH=$PWD/../apache-maven-3.6.3/bin:$PATH
+          mvn verify sonar:sonar \
+            -Dsonar.projectKey=Anastasia-Storozhenko_userstory_app_backend \
+            -Dsonar.organization=anastasia-storozhenko \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=$SONAR_TOKEN
+          echo "Backend Sonar analysis completed successfully"
 
       - name: Cache Maven dependencies
         uses: actions/cache@v4
@@ -48,7 +72,7 @@ jobs:
             -Dsonar.organization=anastasia-storozhenko \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token=$SONAR_TOKEN
-          echo "✅ Backend Sonar analysis completed successfully"
+          echo "Backend Sonar analysis completed successfully"
 
   sonar-frontend:
     name: Frontend SonarCloud Analysis
@@ -91,4 +115,4 @@ jobs:
             -Dsonar.exclusions=node_modules/**,public/**,build/**,**/*.test.*,**/*.spec.*,**/*.js,**/*.ts,**/*.tsx \
             -Dsonar.sourceEncoding=UTF-8 \
             -Dsonar.javascript.node.maxspace=2048
-          echo "✅ Frontend Sonar analysis completed successfully"
+          echo "Frontend Sonar analysis completed successfully"
