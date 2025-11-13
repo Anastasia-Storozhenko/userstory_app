@@ -17,6 +17,7 @@ pipeline {
         DOCKER_HOST = 'tcp://192.168.56.20:2375'
         COMPOSE_HTTP_TIMEOUT = '120'
 
+
         TF_VAR_project_prefix = 'userstory'
         TF_VAR_env_name = 'dev'
         TF_VAR_my_ip_for_ssh = '0.0.0.0/0'
@@ -40,7 +41,9 @@ pipeline {
             }
         }
 
-         stage('Terraform Init & Plan') {
+        
+        
+        stage('Terraform Init & Plan') {
             steps {
                 dir('terraform/envs/dev') {
                     withCredentials([
@@ -95,8 +98,8 @@ pipeline {
                     fi
 
                     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                    unzip -o awscliv2.zip  # Примусова заміна файлів
-                    sudo ./aws/install --update  # Додано --update
+                    unzip -o awscliv2.zip  
+                    sudo ./aws/install --update  
                     rm -rf awscliv2.zip aws
                 '''
             }
@@ -164,7 +167,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             export AWS_DEFAULT_REGION=us-east-1
                             
-                            # Отримуємо токен авторизації для ECR
+                            
                             aws ecr get-login-password --region us-east-1 | docker -H tcp://192.168.56.20:2375 login --username AWS --password-stdin 182000022338.dkr.ecr.us-east-1.amazonaws.com
                             
                             # Функція для спроби пуша з обробкою immutable
@@ -174,7 +177,7 @@ pipeline {
                                 
                                 echo "Attempting to push $image_type..."
                                 
-                                # Пробуємо зробити push
+                                
                                 if docker -H tcp://192.168.56.20:2375 push "$image_name"; then
                                     echo "Successfully pushed $image_type"
                                 else
@@ -190,7 +193,7 @@ pipeline {
                                 fi
                             }
                             
-                            # Пробуємо пушити образи
+                            
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
@@ -201,6 +204,7 @@ pipeline {
             }
         }
 
+        
         stage('Deploy') {
             steps {
                 script {
@@ -211,11 +215,19 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Test Application') {
             steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
+                timeout(time: 2, unit: 'MINUTES') {
+                    script {
+                        sh '''
+                            echo "=== TESTING APPLICATION ==="
+                            # Тест API через DOCKER_HOST
+                            docker -H ${DOCKER_HOST} exec frontend-web curl -s http://localhost:8081/api/projects || echo "API check failed (backend on port 8081)"
+                            # Альтернатива: тест з хоста
+                            curl -s http://192.168.56.20:8080 || echo "Frontend check failed"
+                        '''
+                    }
                 }
             }
         }
@@ -223,6 +235,8 @@ pipeline {
     post {
         always {
             sh "docker -H ${DOCKER_HOST} logout ${DOCKER_REGISTRY}"
+            // Очищення тимчасової папки з Docker-репозиторієм
+            sh "rm -rf docker-deploy-files || true"
         }
     }
 }
