@@ -11,7 +11,7 @@
     <groupId>com.teamstory</groupId>
     <artifactId>userstoryproj</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>userstoryproj</name>
+    <name>Anastasia-Storozhenko_userstory_app_backend</name>
     <description>userstoryproj</description>
     <properties>
         <java.version>17</java.version>
