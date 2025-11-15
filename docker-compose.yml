@@ -34,7 +34,7 @@ services:
     ports:
       - ${DB_PORT}
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME} 
 
 networks:
   app-network:
