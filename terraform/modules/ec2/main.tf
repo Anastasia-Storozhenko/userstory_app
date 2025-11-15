@@ -68,7 +68,7 @@ resource "aws_instance" "backend_instance" {
     DB_HOST         = aws_instance.database_instance.private_ip
     DB_IMAGE_URI    = var.ecr_database_url
     DB_USERNAME     = "userstory_admin"
-    DB_PASSWORD     = "devuser"
+    DB_PASSWORD     = "devuser" # example
     ACCOUNT_ID      = "182000022338"
     DD_SECRET_ARN   = var.datadog_secret_arn
     DD_ROLE         = "backend"

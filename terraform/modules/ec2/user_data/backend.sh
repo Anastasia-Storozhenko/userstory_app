@@ -43,6 +43,22 @@ ECR_URL="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_URL"
 
+MAX_RETRIES=5
+for ((i=1; i<=MAX_RETRIES; i++)); do
+  if aws ecr get-login-password --region "$AWS_REGION" | \
+     docker login --username AWS --password-stdin "$ECR_URL"; then
+    echo "ECR login succeeded."
+    break
+  else
+    echo "ECR login failed (attempt $i/$MAX_RETRIES), retrying in $((5*i))s..."
+    sleep $((5*i))
+  fi
+done
+if [ $i -gt $MAX_RETRIES ]; then
+  echo "CRITICAL ERROR: ECR login failed after $MAX_RETRIES attempts."
+  exit 1
+fi
+
 #### "--- 4. Getting the database secret ---"
 echo "--- 4. Getting the database secret ---"
 SECRET_ARN="${DB_SECRET_ARN}"
