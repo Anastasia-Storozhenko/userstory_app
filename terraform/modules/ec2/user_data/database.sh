@@ -127,10 +127,28 @@ fi
 echo "Installing Datadog agent with retrieved key..."
 DD_AGENT_MAJOR_VERSION=7 DD_API_KEY=$DD_API_KEY DD_SITE=$DD_SITE bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
 
+# --- Enable Docker integration
+echo "Setting up Datadog Docker integration..."
+cat <<EOF | sudo tee /etc/datadog-agent/conf.d/docker.d/conf.yaml
+init_config:
+
+instances:
+  - url: "unix://var/run/docker.sock"
+    new_tag_names: true
+EOF
+
+# --- Add global tags and enable Docker in the main config
+sudo sed -i "s|^# logs_enabled: false|logs_enabled: true|" /etc/datadog-agent/datadog.yaml
+sudo sed -i "s|^# apm_config:|apm_config:\n  enabled: true|" /etc/datadog-agent/datadog.yaml
+
 cat <<EOF | sudo tee -a /etc/datadog-agent/datadog.yaml
 tags:
-  - env:$DD_ENV
-  - role:$DD_ROLE
+  - env:${DD_ENV}
+  - role:${DD_ROLE}
+  - service:docker
+process_config:
+  enabled: "true"
+container_collect_all: true
 EOF
 
 systemctl enable datadog-agent
