@@ -195,28 +195,22 @@ pipeline {
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest" "frontend"
                             try_push_image "182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest" "backend"
                             
-                            echo "🎉 Push process completed"
+                            echo "Push process completed"
                         '''
                     }
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Trigger Deploy Pipeline') {
             steps {
                 script {
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml down || true"
-                    sh "docker-compose -H ${DOCKER_HOST} -f docker-compose.yml up -d --force-recreate || true"
-                    sh "sleep 180"
-                    sh "docker -H ${DOCKER_HOST} ps -a || echo 'No containers running'"
-                }
-            }
-        }
-
-        stage('Test Application') {
-            steps {
-                script {
-                    sh "docker -H ${DOCKER_HOST} exec userstory-frontend curl -s http://localhost/api/projects || echo 'API check failed'"
+                    build job: 'userstory-deploy-pipeline', parameters: [
+                        string(name: 'DOCKER_HOST', value: "${DOCKER_HOST}"),
+                        string(name: 'FRONTEND_IMAGE', value: "${FRONTEND_IMAGE}"),
+                        string(name: 'BACKEND_IMAGE', value: "${BACKEND_IMAGE}"),
+                        string(name: 'COMPOSE_HTTP_TIMEOUT', value: "${COMPOSE_HTTP_TIMEOUT}")
+                    ], wait: true
                 }
             }
         }
