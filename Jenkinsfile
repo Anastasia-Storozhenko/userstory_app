@@ -126,31 +126,33 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
+                    env.DOCKER_HOST = "tcp://192.168.56.20:2375"
                     
+                    // Один раз створюємо builder (якщо ще немає)
+                    sh 'docker buildx create --name mybuilder --driver docker-container --use || true'
+                    sh 'docker buildx inspect --bootstrap || true'
+        
                     dir('frontend') {
                         sh '''
                             docker buildx build \
-                                --progress=plain \
                                 --load \
+                                --pull \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                --cache-from=type=registry,ref=${FRONTEND_IMAGE} \
-                                --cache-to=type=registry,ref=${FRONTEND_IMAGE},mode=max \
-                                -t ${FRONTEND_IMAGE} \
-                                .
+                                --cache-from=type=registry,ref=182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest \
+                                --cache-to=type=registry,ref=182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-frontend-repo:latest,mode=max \
+                                -t ${FRONTEND_IMAGE} .
                         '''
                     }
-
-                    
+        
                     dir('backend') {
                         sh '''
                             docker buildx build \
-                                --progress=plain \
                                 --load \
+                                --pull \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                --cache-from=type=registry,ref=${BACKEND_IMAGE} \
-                                --cache-to=type=registry,ref=${BACKEND_IMAGE},mode=max \
-                                -t ${BACKEND_IMAGE} \
-                                .
+                                --cache-from=type=registry,ref=182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest \
+                                --cache-to=type=registry,ref=182000022338.dkr.ecr.us-east-1.amazonaws.com/userstory-backend-repo:latest,mode=max \
+                                -t ${BACKEND_IMAGE} .
                         '''
                     }
                 }
