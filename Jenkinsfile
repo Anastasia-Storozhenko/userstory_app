@@ -124,35 +124,22 @@ pipeline {
             steps {
                 script {
                     env.DOCKER_HOST = 'tcp://192.168.56.20:2375'
-                    
-                    // Перевірка і створення builder (з логами)
-                    sh '''
-                        echo "=== Перевірка buildx ==="
-                        docker -H ${DOCKER_HOST} buildx version || echo "Buildx не знайдено - перевстанови плагін!"
-                        
-                        docker -H ${DOCKER_HOST} buildx create --name mybuilder --driver docker-container --use --bootstrap || true
-                        docker -H ${DOCKER_HOST} buildx inspect --bootstrap || true
-                    '''
-        
+
                     dir('frontend') {
                         sh """
-                            docker -H \${DOCKER_HOST} buildx build \
-                                --load \
+                            docker -H ${DOCKER_HOST} build \
                                 --pull \
-                                --cache-from=type=registry,ref=\${FRONTEND_IMAGE} \
-                                --cache-to=type=registry,ref=\${FRONTEND_IMAGE},mode=max \
-                                -t \${FRONTEND_IMAGE} .
+                                --no-cache=false \
+                                -t ${FRONTEND_IMAGE} .
                         """
                     }
         
                     dir('backend') {
                         sh """
-                            docker -H \${DOCKER_HOST} buildx build \
-                                --load \
+                            docker -H ${DOCKER_HOST} build \
                                 --pull \
-                                --cache-from=type=registry,ref=\${BACKEND_IMAGE} \
-                                --cache-to=type=registry,ref=\${BACKEND_IMAGE},mode=max \
-                                -t \${BACKEND_IMAGE} .
+                                --no-cache=false \
+                                -t ${BACKEND_IMAGE} .
                         """
                     }
                 }
