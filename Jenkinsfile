@@ -123,43 +123,34 @@ pipeline {
             }
         }
 
-        stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'npm install'
-                    sh 'CI=false npm run build'
-                }
-            }
-        }
-
-        stage('Build Backend') {
-            steps {
-                dir('backend') {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
-        }
-
         stage('Build Docker Images') {
             steps {
                 script {
-                    env.DOCKER_HOST = "tcp://192.168.56.20:2375"
                     
                     dir('frontend') {
                         sh '''
                             docker buildx build \
                                 --progress=plain \
                                 --load \
-                                -t ${FRONTEND_IMAGE} .
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                --cache-from=type=registry,ref=${FRONTEND_IMAGE} \
+                                --cache-to=type=registry,ref=${FRONTEND_IMAGE},mode=max \
+                                -t ${FRONTEND_IMAGE} \
+                                .
                         '''
                     }
+
                     
                     dir('backend') {
                         sh '''
                             docker buildx build \
                                 --progress=plain \
                                 --load \
-                                -t ${BACKEND_IMAGE} .
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                --cache-from=type=registry,ref=${BACKEND_IMAGE} \
+                                --cache-to=type=registry,ref=${BACKEND_IMAGE},mode=max \
+                                -t ${BACKEND_IMAGE} \
+                                .
                         '''
                     }
                 }
