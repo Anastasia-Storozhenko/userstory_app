@@ -1,19 +1,20 @@
 
-FROM node:20.18-alpine AS base
+FROM node:20-alpine AS builder
+
 WORKDIR /app
 
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY package*.json ./
 
-COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN npm ci --only=production --silent
 
 COPY . .
-RUN pnpm run build
+
+RUN npm run build
 
 FROM nginx:alpine
-COPY --from=base /app/build /usr/share/nginx/html
+COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
