@@ -41,6 +41,8 @@ ECR_BACKEND_URL="${ECR_BACKEND_URL}"
 ACCOUNT_ID=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .accountId)
 ECR_URL="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
+sleep 30 ## Waiting 40 sec for network/DNS/ECR routing...
+
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_URL"
 
 MAX_RETRIES=5
