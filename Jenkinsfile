@@ -143,21 +143,24 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
+                    env.DOCKER_HOST = "tcp://192.168.56.20:2375"
                     
-                    env.DOCKER_BUILDKIT = 1
-                    env.COMPOSE_DOCKER_CLI_BUILD = 1
-        
                     dir('frontend') {
-                        sh """
-                            docker build \
+                        sh '''
+                            docker buildx build \
                                 --progress=plain \
-                                --no-cache=false \
+                                --load \
                                 -t ${FRONTEND_IMAGE} .
-                        """
+                        '''
                     }
-        
+                    
                     dir('backend') {
-                        sh "docker build -t ${BACKEND_IMAGE} ."
+                        sh '''
+                            docker buildx build \
+                                --progress=plain \
+                                --load \
+                                -t ${BACKEND_IMAGE} .
+                        '''
                     }
                 }
             }
