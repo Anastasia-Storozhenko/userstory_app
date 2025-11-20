@@ -1,0 +1,32 @@
+# Обов’язково ігноруємо, бо це зайві мегабайти в build context
+node_modules
+build
+dist
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+nginx.conf
+
+# Локальні env-файли
+.env
+.env.local
+.env.development
+.env.production
+
+# Логи та кеш
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# ОС
+.DS_Store
+Thumbs.db
