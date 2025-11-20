@@ -123,23 +123,14 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
-                    env.DOCKER_HOST = 'tcp://192.168.56.20:2375'
-
                     dir('frontend') {
                         sh """
-                            docker -H ${DOCKER_HOST} build \
-                                --pull \
-                                --no-cache=false \
-                                -t ${FRONTEND_IMAGE} .
+                            docker -H ${DOCKER_HOST} build --pull -t ${FRONTEND_IMAGE} .
                         """
                     }
-        
                     dir('backend') {
                         sh """
-                            docker -H ${DOCKER_HOST} build \
-                                --pull \
-                                --no-cache=false \
-                                -t ${BACKEND_IMAGE} .
+                            docker -H ${DOCKER_HOST} build --pull -t ${BACKEND_IMAGE} .
                         """
                     }
                 }
