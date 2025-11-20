@@ -143,11 +143,21 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
+                    
+                    env.DOCKER_BUILDKIT = 1
+                    env.COMPOSE_DOCKER_CLI_BUILD = 1
+        
                     dir('frontend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${FRONTEND_IMAGE} ."
+                        sh """
+                            docker build \
+                                --progress=plain \
+                                --no-cache=false \
+                                -t ${FRONTEND_IMAGE} .
+                        """
                     }
+        
                     dir('backend') {
-                        sh "docker -H ${DOCKER_HOST} build -t ${BACKEND_IMAGE} ."
+                        sh "docker build -t ${BACKEND_IMAGE} ."
                     }
                 }
             }
